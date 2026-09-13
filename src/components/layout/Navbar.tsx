@@ -39,6 +39,7 @@ export function Navbar({ user }: NavbarProps) {
         { href: "/admin", label: "Dashboard", icon: Sparkles },
         { href: "/admin/borrador", label: "Borrador Diario", icon: ClipboardList },
         { href: "/admin/agentes", label: "Colaboradores", icon: Users },
+        { href: "/admin/configuracion", label: "Configuración", icon: Settings },
         { href: "/agente", label: "Vista Agente", icon: Scissors },
       ];
     }

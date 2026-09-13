@@ -147,6 +147,11 @@ export async function getAgentes(): Promise<Agente[]> {
   }
 }
 
+export async function addAgente(agente: Agente): Promise<Agente> {
+  memoryStore.agentes.push(agente);
+  return agente;
+}
+
 // ----------------------------------------------------
 // CLIENTES
 // ----------------------------------------------------
@@ -468,8 +473,101 @@ export async function updateCita(
 // ----------------------------------------------------
 // HISTORIAL DE CLIENTE (Borrador + OATC histórico)
 // ----------------------------------------------------
+// ----------------------------------------------------
+// HISTORIAL DE CLIENTE (Borrador + OATC histórico)
+// ----------------------------------------------------
 export async function getHistorialCliente(clienteId: string): Promise<BorradorEntry[]> {
   const enBorrador = memoryStore.borrador.filter((b) => b.id_cliente === clienteId);
   const enOATC = memoryStore.oatc.filter((o) => o.id_cliente === clienteId);
   return [...enBorrador, ...enOATC];
+}
+
+// ----------------------------------------------------
+// CIERRE DE DÍA (Migración Borrador -> OATC y Asistencia)
+// ----------------------------------------------------
+export interface ResumenCierre {
+  fecha: string;
+  totalOatcsMigradas: number;
+  totalVentasMigradas: number;
+  totalAsistencias: number;
+  migradoEn: string;
+}
+
+export async function ejecutarCierreDeDia(): Promise<ResumenCierre> {
+  const client = getSheetsClient();
+  const fechaHoy = new Date().toISOString().split("T")[0];
+  const timestamp = new Date().toISOString();
+
+  const oatcsAMigrar = [...memoryStore.borrador];
+  const totalVentas = oatcsAMigrar.reduce(
+    (acc, curr) => acc + (Number(curr.precio_final) || 0),
+    0
+  );
+
+  // 1. Migrar a histórico OATC
+  for (const item of oatcsAMigrar) {
+    const registroOATC: OATCRecord = {
+      ...item,
+      migrado_en: timestamp,
+    };
+    memoryStore.oatc.push(registroOATC);
+
+    if (client) {
+      try {
+        const row = [
+          item.id_oatc,
+          item.fecha,
+          item.hora_inicio,
+          item.tipo_consumidor,
+          item.id_cliente || "",
+          item.nombre_consumidor,
+          item.id_agente,
+          item.nombre_agente,
+          item.id_servicio,
+          item.nombre_servicio,
+          item.etapa,
+          item.precio_final,
+          item.productos_usados || "",
+          item.insumos_usados || "",
+          item.productos_vendidos || "",
+          item.correlativo_sistema,
+          item.comprobante_externo || "",
+          item.notas || "",
+          item.hora_fin || "",
+          timestamp,
+        ];
+
+        await client.sheets.spreadsheets.values.append({
+          spreadsheetId: client.sheetId,
+          range: "OATC!A2:T",
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [row] },
+        });
+      } catch (err) {
+        console.error("Error migrando fila a OATC en Google Sheets:", err);
+      }
+    }
+  }
+
+  // 2. Limpiar la hoja Borrador
+  memoryStore.borrador = [];
+
+  if (client) {
+    try {
+      await client.sheets.spreadsheets.values.clear({
+        spreadsheetId: client.sheetId,
+        range: "Borrador!A2:S",
+      });
+    } catch (err) {
+      console.error("Error limpiando Borrador en Google Sheets:", err);
+    }
+  }
+
+  return {
+    fecha: fechaHoy,
+    totalOatcsMigradas: oatcsAMigrar.length,
+    totalVentasMigradas: totalVentas,
+    totalAsistencias: memoryStore.asistencia.length,
+    migradoEn: timestamp,
+  };
 }
