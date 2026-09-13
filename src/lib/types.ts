@@ -120,6 +120,17 @@ export interface CitaRecord {
   notas?: string;
 }
 
+export interface TurnoEspera {
+  id: string; // TRN-001
+  nombre_consumidor: string;
+  id_servicio: string;
+  nombre_servicio: string;
+  especialidad_requerida: string;
+  hora_llegada: string;
+  estado: "en_espera" | "atendido" | "cancelado";
+  notas?: string;
+}
+
 export interface SalonConfig {
   nombre_salon: string;
   hora_cierre_auto: string;

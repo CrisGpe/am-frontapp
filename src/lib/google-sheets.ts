@@ -32,6 +32,27 @@ class InMemoryStore {
   asistencia: AsistenciaRecord[] = [];
   oatc: OATCRecord[] = [];
   citas: CitaRecord[] = [];
+  turnos: TurnoEspera[] = [
+    {
+      id: "TRN-001",
+      nombre_consumidor: "Gabriela Luna",
+      id_servicio: "SV-001",
+      nombre_servicio: "Corte y Peinado Dama",
+      especialidad_requerida: "estilista",
+      hora_llegada: "11:20",
+      estado: "en_espera",
+      notas: "Cliente casual que entró al salón.",
+    },
+    {
+      id: "TRN-002",
+      nombre_consumidor: "Roberto Ramos",
+      id_servicio: "SV-002",
+      nombre_servicio: "Corte Caballero & Perfilado",
+      especialidad_requerida: "estilista",
+      hora_llegada: "11:35",
+      estado: "en_espera",
+    },
+  ];
   config: SalonConfig = { ...INITIAL_CONFIG };
 }
 
@@ -322,6 +343,38 @@ export async function updateBorradorEntry(
   };
 
   return memoryStore.borrador[index];
+}
+
+// ----------------------------------------------------
+// TURNOS
+// ----------------------------------------------------
+export async function getTurnos(): Promise<TurnoEspera[]> {
+  return memoryStore.turnos;
+}
+
+export async function addTurno(turno: TurnoEspera): Promise<TurnoEspera> {
+  memoryStore.turnos.push(turno);
+  return turno;
+}
+
+export async function updateTurno(
+  id: string,
+  updates: Partial<TurnoEspera>
+): Promise<TurnoEspera | null> {
+  const idx = memoryStore.turnos.findIndex((t) => t.id === id);
+  if (idx === -1) return null;
+  memoryStore.turnos[idx] = { ...memoryStore.turnos[idx], ...updates };
+  return memoryStore.turnos[idx];
+}
+
+export async function updateAgenteDisponibilidad(
+  agenteId: string,
+  disponible: boolean
+): Promise<Agente | null> {
+  const idx = memoryStore.agentes.findIndex((a) => a.id === agenteId);
+  if (idx === -1) return null;
+  memoryStore.agentes[idx].disponible_turnos = disponible;
+  return memoryStore.agentes[idx];
 }
 
 // ----------------------------------------------------
