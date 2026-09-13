@@ -32,7 +32,30 @@ class InMemoryStore {
   borrador: BorradorEntry[] = [...MOCK_BORRADOR];
   asistencia: AsistenciaRecord[] = [];
   oatc: OATCRecord[] = [];
-  citas: CitaRecord[] = [];
+  citas: CitaRecord[] = [
+    {
+      id: "CT-001",
+      id_cliente: "CL-001",
+      id_agente: "AG-001",
+      id_servicio: "SV-001",
+      fecha: "2026-09-15",
+      hora: "10:00",
+      estado: "confirmada",
+      creada_en: "2026-09-13T10:00:00Z",
+      notas: "Corte regular de mantenimiento.",
+    },
+    {
+      id: "CT-002",
+      id_cliente: "CL-002",
+      id_agente: "AG-003",
+      id_servicio: "SV-003",
+      fecha: "2026-09-16",
+      hora: "15:00",
+      estado: "confirmada",
+      creada_en: "2026-09-13T11:30:00Z",
+      notas: "Retoque de raíz balayage.",
+    },
+  ];
   turnos: TurnoEspera[] = [
     {
       id: "TRN-001",
@@ -415,4 +438,38 @@ export async function updateSalonConfig(updates: Partial<SalonConfig>): Promise<
     ...updates,
   };
   return memoryStore.config;
+}
+
+// ----------------------------------------------------
+// CITAS (Agenda de Clientes)
+// ----------------------------------------------------
+export async function getCitas(clienteId?: string): Promise<CitaRecord[]> {
+  if (clienteId) {
+    return memoryStore.citas.filter((c) => c.id_cliente === clienteId);
+  }
+  return memoryStore.citas;
+}
+
+export async function addCita(cita: CitaRecord): Promise<CitaRecord> {
+  memoryStore.citas.push(cita);
+  return cita;
+}
+
+export async function updateCita(
+  id: string,
+  updates: Partial<CitaRecord>
+): Promise<CitaRecord | null> {
+  const idx = memoryStore.citas.findIndex((c) => c.id === id);
+  if (idx === -1) return null;
+  memoryStore.citas[idx] = { ...memoryStore.citas[idx], ...updates };
+  return memoryStore.citas[idx];
+}
+
+// ----------------------------------------------------
+// HISTORIAL DE CLIENTE (Borrador + OATC histórico)
+// ----------------------------------------------------
+export async function getHistorialCliente(clienteId: string): Promise<BorradorEntry[]> {
+  const enBorrador = memoryStore.borrador.filter((b) => b.id_cliente === clienteId);
+  const enOATC = memoryStore.oatc.filter((o) => o.id_cliente === clienteId);
+  return [...enBorrador, ...enOATC];
 }

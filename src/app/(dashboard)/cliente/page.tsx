@@ -29,9 +29,12 @@ export default async function ClienteDashboardPage() {
 
       {/* Quick Action Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        <Link
+          href="/cliente/citas"
+          className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-all group"
+        >
           <div>
-            <div className="w-10 h-10 rounded-xl bg-earth-500/10 text-earth-600 flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-xl bg-earth-500/10 text-earth-600 flex items-center justify-center mb-4 group-hover:bg-earth-500 group-hover:text-white transition-colors">
               <Calendar className="w-5 h-5" />
             </div>
             <h2 className="text-lg font-bold text-earth-900 dark:text-cream-100">
@@ -42,15 +45,18 @@ export default async function ClienteDashboardPage() {
             </p>
           </div>
           <div className="mt-6">
-            <span className="inline-flex items-center gap-2 text-xs font-semibold text-earth-700 dark:text-cream-200 bg-earth-100 dark:bg-earth-800 px-3 py-2 rounded-xl">
-              Agenda interactiva activa en Fase 4 <ArrowRight className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-2 text-xs font-semibold text-earth-700 dark:text-cream-200 bg-earth-100 dark:bg-earth-800 px-3.5 py-2 rounded-xl group-hover:bg-earth-500 group-hover:text-white transition-colors">
+              Reservar ahora <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        <Link
+          href="/cliente/historial"
+          className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-all group"
+        >
           <div>
-            <div className="w-10 h-10 rounded-xl bg-sage-500/10 text-sage-600 flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-xl bg-sage-500/10 text-sage-600 flex items-center justify-center mb-4 group-hover:bg-sage-600 group-hover:text-white transition-colors">
               <Clock className="w-5 h-5" />
             </div>
             <h2 className="text-lg font-bold text-earth-900 dark:text-cream-100">
@@ -61,11 +67,11 @@ export default async function ClienteDashboardPage() {
             </p>
           </div>
           <div className="mt-6">
-            <span className="inline-flex items-center gap-2 text-xs font-semibold text-sage-800 dark:text-sage-200 bg-sage-50 dark:bg-sage-950 px-3 py-2 rounded-xl">
-              Consulta en tiempo real
+            <span className="inline-flex items-center gap-2 text-xs font-semibold text-sage-800 dark:text-sage-200 bg-sage-50 dark:bg-sage-950 px-3.5 py-2 rounded-xl group-hover:bg-sage-600 group-hover:text-white transition-colors">
+              Ver mis visitas <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Featured Services */}
