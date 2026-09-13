@@ -1,7 +1,10 @@
-import React from "react";
-import { getCurrentUser } from "@/lib/auth";
-import { getBorrador, getServicios } from "@/lib/google-sheets";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { BorradorEntry, EtapaOATC, UserSession } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+import { CobranzaModal } from "@/components/oatc/CobranzaModal";
+import { NuevaOATCModal } from "@/components/oatc/NuevaOATCModal";
 import {
   Scissors,
   Clock,
@@ -11,17 +14,80 @@ import {
   CreditCard,
   PlusCircle,
   Sparkles,
+  ArrowRight,
+  Receipt,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 
-export default async function AgenteDashboardPage() {
-  const user = await getCurrentUser();
-  const allBorrador = await getBorrador();
-  const servicios = await getServicios();
+export default function AgenteDashboardPage() {
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [oatcs, setOatcs] = useState<BorradorEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtroEtapa, setFiltroEtapa] = useState<string>("todas");
 
-  // Filtrar OATCs asignadas a este agente o abiertas
-  const misOatcs = allBorrador.filter(
+  // Modales
+  const [cobranzaOatc, setCobranzaOatc] = useState<BorradorEntry | null>(null);
+  const [nuevaOatcOpen, setNuevaOatcOpen] = useState(false);
+
+  useEffect(() => {
+    cargarSesion();
+    cargarBorrador();
+  }, []);
+
+  const cargarSesion = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (data.user) setUser(data.user);
+    } catch (err) {
+      console.error("Error al cargar sesión:", err);
+    }
+  };
+
+  const cargarBorrador = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/borrador");
+      const data = await res.json();
+      if (data.borrador) {
+        setOatcs(data.borrador);
+      }
+    } catch (err) {
+      console.error("Error cargando borrador:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCambiarEtapa = async (id_oatc: string, nuevaEtapa: EtapaOATC) => {
+    try {
+      const res = await fetch("/api/borrador", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_oatc,
+          updates: { etapa: nuevaEtapa },
+        }),
+      });
+
+      if (res.ok) {
+        cargarBorrador();
+      }
+    } catch (err) {
+      console.error("Error cambiando etapa:", err);
+    }
+  };
+
+  // Filtrado de OATCs asignadas a este agente o todas si es admin
+  const misOatcs = oatcs.filter(
     (item) => item.id_agente === user?.userId || user?.rol === "admin"
   );
+
+  const oatcsFiltradas = misOatcs.filter((item) => {
+    if (filtroEtapa === "todas") return true;
+    return item.etapa === filtroEtapa;
+  });
 
   const etapaColors: Record<string, string> = {
     asesoria: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200 border-blue-300",
@@ -34,7 +100,7 @@ export default async function AgenteDashboardPage() {
   const etapaLabels: Record<string, string> = {
     asesoria: "1. Asesoría",
     atencion: "2. En Atención",
-    fin_atencion: "3. Fin de Atención",
+    fin_atencion: "3. Fin Atención",
     cobranza: "4. En Cobranza",
     completada: "5. Completada",
   };
@@ -44,12 +110,12 @@ export default async function AgenteDashboardPage() {
       {/* Top Banner */}
       <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-earth-600 dark:text-earth-400 text-sm font-medium mb-1">
+          <div className="flex items-center gap-2 text-earth-600 dark:text-earth-400 text-xs font-semibold uppercase tracking-wider mb-1">
             <Sparkles className="w-4 h-4 text-earth-500" />
-            <span>Panel de Colaborador</span>
+            <span>Centro Operativo del Colaborador</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-earth-900 dark:text-cream-100">
-            ¡Hola, {user?.nombre}!
+            ¡Hola, {user?.nombre || "Colaborador"}!
           </h1>
           <p className="text-sm text-earth-600 dark:text-earth-400 mt-1">
             Especialidades:{" "}
@@ -60,12 +126,20 @@ export default async function AgenteDashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="px-4 py-2 rounded-2xl bg-sage-50 dark:bg-sage-950/60 border border-sage-200 dark:border-sage-800 flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-sage-500 animate-pulse" />
-            <span className="text-xs font-semibold text-sage-800 dark:text-sage-200">
-              Disponible para Turnos
-            </span>
-          </div>
+          <button
+            onClick={cargarBorrador}
+            className="p-2.5 rounded-xl border border-earth-200 dark:border-earth-800 hover:bg-earth-100 dark:hover:bg-earth-800 text-earth-600 transition-colors"
+            title="Recargar órdenes"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setNuevaOatcOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-earth-500 hover:bg-earth-600 text-white font-bold text-sm shadow-md shadow-earth-500/20 active:scale-95 transition-all"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Nueva OATC</span>
+          </button>
         </div>
       </div>
 
@@ -73,7 +147,7 @@ export default async function AgenteDashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-4 shadow-sm">
           <span className="text-xs font-medium text-earth-500 dark:text-earth-400 block mb-1">
-            OATCs Hoy
+            Mis OATCs Hoy
           </span>
           <span className="text-2xl font-bold text-earth-900 dark:text-cream-100">
             {misOatcs.length}
@@ -89,7 +163,7 @@ export default async function AgenteDashboardPage() {
         </div>
         <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-4 shadow-sm">
           <span className="text-xs font-medium text-earth-500 dark:text-earth-400 block mb-1">
-            Pendientes Cobro
+            En Cobranza
           </span>
           <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">
             {misOatcs.filter((o) => o.etapa === "cobranza").length}
@@ -97,49 +171,65 @@ export default async function AgenteDashboardPage() {
         </div>
         <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-4 shadow-sm">
           <span className="text-xs font-medium text-earth-500 dark:text-earth-400 block mb-1">
-            Total Generado
+            Completadas
           </span>
-          <span className="text-xl font-bold text-earth-900 dark:text-cream-100">
-            {formatCurrency(
-              misOatcs.reduce((acc, curr) => acc + (Number(curr.precio_final) || 0), 0)
-            )}
+          <span className="text-2xl font-bold text-sage-600 dark:text-sage-400">
+            {misOatcs.filter((o) => o.etapa === "completada").length}
           </span>
         </div>
       </div>
 
-      {/* OATCs List / Borrador */}
-      <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-bold text-earth-900 dark:text-cream-100">
-              Órdenes de Atención Activas (Borrador)
-            </h2>
-            <p className="text-xs text-earth-500 dark:text-earth-400">
-              Control operativo en tiempo real para el cierre de día
-            </p>
-          </div>
-        </div>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {[
+          { id: "todas", label: `Todas (${misOatcs.length})` },
+          { id: "asesoria", label: "Asesoría" },
+          { id: "atencion", label: "En Atención" },
+          { id: "fin_atencion", label: "Fin Atención" },
+          { id: "cobranza", label: "Cobranza" },
+          { id: "completada", label: "Completadas" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setFiltroEtapa(tab.id)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              filtroEtapa === tab.id
+                ? "bg-earth-500 text-white shadow-sm shadow-earth-500/20"
+                : "bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 text-earth-700 dark:text-cream-200 hover:bg-earth-50"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {misOatcs.length === 0 ? (
+      {/* OATC Cards Grid */}
+      <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl p-6 shadow-sm">
+        {loading ? (
+          <div className="py-12 text-center text-sm text-earth-500">
+            Cargando órdenes del día...
+          </div>
+        ) : oatcsFiltradas.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-earth-200 dark:border-earth-800 rounded-2xl">
             <Scissors className="w-10 h-10 mx-auto text-earth-400 mb-2 opacity-50" />
             <p className="text-sm font-medium text-earth-600 dark:text-earth-400">
-              No tienes órdenes activas en este momento
+              No hay órdenes de atención en esta etapa
             </p>
             <p className="text-xs text-earth-400 mt-1">
-              Las nuevas atenciones y turnos aparecerán aquí automáticamente
+              Puedes crear una nueva usando el botón superior "Nueva OATC"
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {misOatcs.map((oatc) => (
+            {oatcsFiltradas.map((oatc) => (
               <div
                 key={oatc.id_oatc}
-                className="border border-earth-200 dark:border-earth-800 rounded-2xl p-5 hover:shadow-md transition-shadow bg-earth-50/40 dark:bg-earth-950/40 flex flex-col justify-between"
+                className="border border-earth-200 dark:border-earth-800 rounded-2xl p-5 bg-earth-50/40 dark:bg-earth-950/40 flex flex-col justify-between hover:shadow-md transition-shadow"
               >
                 <div>
+                  {/* Top card info */}
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-xs font-mono font-bold text-earth-500 dark:text-earth-400">
+                    <span className="text-xs font-mono font-bold text-earth-500">
                       {oatc.id_oatc}
                     </span>
                     <span
@@ -169,8 +259,14 @@ export default async function AgenteDashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-3.5 h-3.5 text-earth-400" />
-                      <span>Precio: <strong>{formatCurrency(oatc.precio_final)}</strong></span>
+                      <span>Precio actual: <strong>{formatCurrency(oatc.precio_final)}</strong></span>
                     </div>
+                    {oatc.comprobante_externo && (
+                      <div className="flex items-center gap-2 text-sage-700 dark:text-sage-300 font-semibold">
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>Comprobante: {oatc.comprobante_externo}</span>
+                      </div>
+                    )}
                   </div>
 
                   {oatc.notas && (
@@ -180,19 +276,93 @@ export default async function AgenteDashboardPage() {
                   )}
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-earth-200/80 dark:border-earth-800/80 flex items-center justify-between text-xs">
-                  <span className="text-earth-500 font-mono">
-                    Corr: {oatc.correlativo_sistema}
-                  </span>
-                  <span className="font-semibold text-earth-700 dark:text-earth-300">
-                    Atendido por: {oatc.nombre_agente}
-                  </span>
+                {/* Botones de cambio de etapa */}
+                <div className="mt-5 pt-3 border-t border-earth-200/80 dark:border-earth-800/80">
+                  {oatc.etapa === "asesoria" && (
+                    <button
+                      onClick={() => handleCambiarEtapa(oatc.id_oatc, "atencion")}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Comenzar Atención
+                    </button>
+                  )}
+
+                  {oatc.etapa === "atencion" && (
+                    <button
+                      onClick={() => handleCambiarEtapa(oatc.id_oatc, "fin_atencion")}
+                      className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Finalizar Atención del Servicio
+                    </button>
+                  )}
+
+                  {oatc.etapa === "fin_atencion" && (
+                    <button
+                      onClick={() => handleCambiarEtapa(oatc.id_oatc, "cobranza")}
+                      className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      Pasar a Cobranza / Caja
+                    </button>
+                  )}
+
+                  {oatc.etapa === "cobranza" && (
+                    <button
+                      onClick={() => setCobranzaOatc(oatc)}
+                      className="w-full py-2.5 rounded-xl bg-sage-600 hover:bg-sage-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-sage-600/20 transition-all animate-pulse"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      Ingresar Comprobante & Cerrar Cobro
+                    </button>
+                  )}
+
+                  {oatc.etapa === "completada" && (
+                    <div className="flex items-center justify-between text-xs text-sage-600 dark:text-sage-400 font-semibold py-1">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-sage-500" />
+                        Completada & Cobrada
+                      </span>
+                      <span className="font-mono text-earth-500">
+                        Fin: {oatc.hora_fin || "Registrado"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Modales */}
+      {cobranzaOatc && (
+        <CobranzaModal
+          isOpen={!!cobranzaOatc}
+          oatc={cobranzaOatc}
+          onClose={() => setCobranzaOatc(null)}
+          onSuccess={() => {
+            setCobranzaOatc(null);
+            cargarBorrador();
+          }}
+        />
+      )}
+
+      {nuevaOatcOpen && (
+        <NuevaOATCModal
+          isOpen={nuevaOatcOpen}
+          onClose={() => setNuevaOatcOpen(false)}
+          onSuccess={() => {
+            setNuevaOatcOpen(false);
+            cargarBorrador();
+          }}
+          currentAgent={{
+            id: user?.userId || "AG-001",
+            nombre: user?.nombre || "Colaborador",
+          }}
+        />
+      )}
     </div>
   );
 }
