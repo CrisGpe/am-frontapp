@@ -370,8 +370,53 @@ export async function updateBorradorEntry(
     ...memoryStore.borrador[index],
     ...updates,
   };
+  const updated = memoryStore.borrador[index];
 
-  return memoryStore.borrador[index];
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Borrador!A2:A",
+      });
+      const rows = res.data.values || [];
+      const sheetRowIdx = rows.findIndex((r) => r[0] === id_oatc);
+      if (sheetRowIdx !== -1) {
+        const rowNum = sheetRowIdx + 2;
+        const rowValues = [
+          updated.id_oatc,
+          updated.fecha,
+          updated.hora_inicio,
+          updated.tipo_consumidor,
+          updated.id_cliente || "",
+          updated.nombre_consumidor,
+          updated.id_agente,
+          updated.nombre_agente,
+          updated.id_servicio,
+          updated.nombre_servicio,
+          updated.etapa,
+          updated.precio_final,
+          updated.productos_usados || "",
+          updated.insumos_usados || "",
+          updated.productos_vendidos || "",
+          updated.correlativo_sistema,
+          updated.comprobante_externo || "",
+          updated.notas || "",
+          updated.hora_fin || "",
+        ];
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Borrador!A${rowNum}:S${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [rowValues] },
+        });
+      }
+    } catch (err) {
+      console.error("Error actualizando Borrador en Google Sheets:", err);
+    }
+  }
+
+  return updated;
 }
 
 // ----------------------------------------------------
@@ -434,15 +479,62 @@ export async function registrarAsistencia(record: AsistenciaRecord): Promise<Asi
 // CONFIGURACIÓN
 // ----------------------------------------------------
 export async function getSalonConfig(): Promise<SalonConfig> {
-  return memoryStore.config;
+  const client = getSheetsClient();
+  if (!client) return memoryStore.config;
+
+  try {
+    const res = await client.sheets.spreadsheets.values.get({
+      spreadsheetId: client.sheetId,
+      range: "Configuracion!A2:B10",
+    });
+    const rows = res.data.values || [];
+    if (rows.length === 0) return memoryStore.config;
+
+    const map: Record<string, string> = {};
+    rows.forEach((r) => {
+      if (r[0]) map[r[0]] = r[1] || "";
+    });
+
+    const cfg: SalonConfig = {
+      nombre_salon: map["nombre_salon"] || memoryStore.config.nombre_salon,
+      hora_cierre_auto: map["hora_cierre_auto"] || memoryStore.config.hora_cierre_auto,
+      zona_horaria: map["zona_horaria"] || memoryStore.config.zona_horaria,
+      correlativo_actual: Number(map["correlativo_actual"]) || memoryStore.config.correlativo_actual,
+    };
+    memoryStore.config = cfg;
+    return cfg;
+  } catch (err) {
+    console.warn("Fallback a memoria para Configuracion:", err);
+    return memoryStore.config;
+  }
 }
 
 export async function updateSalonConfig(updates: Partial<SalonConfig>): Promise<SalonConfig> {
-  memoryStore.config = {
-    ...memoryStore.config,
-    ...updates,
-  };
-  return memoryStore.config;
+  const current = await getSalonConfig();
+  const next: SalonConfig = { ...current, ...updates };
+  memoryStore.config = next;
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const rows = [
+        ["nombre_salon", next.nombre_salon],
+        ["hora_cierre_auto", next.hora_cierre_auto],
+        ["zona_horaria", next.zona_horaria],
+        ["correlativo_actual", String(next.correlativo_actual)],
+      ];
+      await client.sheets.spreadsheets.values.update({
+        spreadsheetId: client.sheetId,
+        range: "Configuracion!A2:B5",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: rows },
+      });
+    } catch (err) {
+      console.error("Error al actualizar Configuracion en Google Sheets:", err);
+    }
+  }
+
+  return next;
 }
 
 // ----------------------------------------------------
