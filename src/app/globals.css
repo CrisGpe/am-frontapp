@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #FBF8F3;
+  --foreground: #2A2118;
+  --card: #FFFFFF;
+  --card-foreground: #2A2118;
+  --primary: #8B6914;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E5ECE0;
+  --secondary-foreground: #2C3B20;
+  --muted: #F4EDE0;
+  --muted-foreground: #7F6745;
+  --accent: #87A96B;
+  --accent-foreground: #FFFFFF;
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --border: #E7D7C1;
+  --input: #E7D7C1;
+  --ring: #8B6914;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: #181512;
+  --foreground: #F4EDE0;
+  --card: #221D18;
+  --card-foreground: #F4EDE0;
+  --primary: #D4A55A;
+  --primary-foreground: #181512;
+  --secondary: #2C3B20;
+  --secondary-foreground: #E5ECE0;
+  --muted: #302820;
+  --muted-foreground: #B89569;
+  --accent: #87A96B;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #3D3328;
+  --input: #3D3328;
+  --ring: #D4A55A;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100vh;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6BDA0;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #443007;
+}
