@@ -10,6 +10,7 @@ import {
   OATCRecord,
   CitaRecord,
   SalonConfig,
+  TurnoEspera,
 } from "./types";
 import {
   MOCK_AGENTES,
