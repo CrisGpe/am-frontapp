@@ -16,11 +16,7 @@ export async function getCitas(clienteId?: string): Promise<CitaRecord[]> {
       range: "Citas!A2:I",
     });
     const rows = res.data.values || [];
-    if (rows.length === 0) {
-      return clienteId
-        ? memoryStore.citas.filter((c) => c.id_cliente === clienteId)
-        : memoryStore.citas;
-    }
+    if (rows.length === 0) return [];
 
     const citas: CitaRecord[] = rows.map((r) => ({
       id: r[0] || "",

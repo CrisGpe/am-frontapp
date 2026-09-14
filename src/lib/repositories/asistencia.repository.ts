@@ -12,7 +12,7 @@ export async function getAsistenciaHoy(fecha: string): Promise<AsistenciaRecord[
       range: "Asistencia!A2:F",
     });
     const rows = res.data.values || [];
-    if (rows.length === 0) return memoryStore.asistencia.filter((a) => a.fecha === fecha);
+    if (rows.length === 0) return [];
 
     return rows
       .filter((r) => r[0] === fecha)

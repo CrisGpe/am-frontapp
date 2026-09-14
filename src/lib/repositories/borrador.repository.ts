@@ -12,7 +12,7 @@ export async function getBorrador(): Promise<BorradorEntry[]> {
       range: "Borrador!A2:S",
     });
     const rows = res.data.values || [];
-    if (rows.length === 0) return memoryStore.borrador;
+    if (rows.length === 0) return [];
 
     return rows.map((r) => ({
       id_oatc: r[0] || "",

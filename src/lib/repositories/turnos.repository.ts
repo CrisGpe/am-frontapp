@@ -12,7 +12,7 @@ export async function getTurnos(): Promise<TurnoEspera[]> {
       range: "Turnos!A2:K",
     });
     const rows = res.data.values || [];
-    if (rows.length === 0) return memoryStore.turnos;
+    if (rows.length === 0) return [];
 
     return rows.map((r) => ({
       id: r[0] || "",
