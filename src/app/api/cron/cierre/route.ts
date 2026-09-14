@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ejecutarCierreDeDia } from "@/lib/google-sheets";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const resumen = await ejecutarCierreDeDia();

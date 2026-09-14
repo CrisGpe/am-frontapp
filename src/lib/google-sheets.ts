@@ -84,23 +84,32 @@ const memoryStore = new InMemoryStore();
 
 function getSheetsClient() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
   const sheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!email || !privateKey || !sheetId) {
+    console.warn(
+      "⚠️ Credenciales de Google Sheets no encontradas (GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SHEET_ID). Usando fallback en memoria."
+    );
     return null;
   }
 
   try {
+    privateKey = privateKey.trim();
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
     const auth = new google.auth.JWT({
-      email,
+      email: email.trim(),
       key: privateKey,
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
     return {
       sheets: google.sheets({ version: "v4", auth }),
-      sheetId,
+      sheetId: sheetId.trim(),
     };
   } catch (err) {
     console.error("Error al inicializar cliente de Google Sheets:", err);
@@ -149,6 +158,37 @@ export async function getAgentes(): Promise<Agente[]> {
 
 export async function addAgente(agente: Agente): Promise<Agente> {
   memoryStore.agentes.push(agente);
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const row = [
+        agente.id,
+        agente.nombre,
+        agente.pin,
+        agente.rol,
+        (agente.especialidades || []).join(", "),
+        agente.telefono || "",
+        agente.email || "",
+        agente.horario_lun || "",
+        agente.horario_mar || "",
+        agente.horario_mie || "",
+        agente.horario_jue || "",
+        agente.horario_vie || "",
+        agente.horario_sab || "",
+        agente.horario_dom || "",
+        String(agente.disponible_turnos ?? true),
+        String(agente.activo ?? true),
+      ];
+      await client.sheets.spreadsheets.values.append({
+        spreadsheetId: client.sheetId,
+        range: "Agentes!A2:P",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+    } catch (err) {
+      console.error("Error al agregar agente en Google Sheets:", err);
+    }
+  }
   return agente;
 }
 
@@ -183,6 +223,37 @@ export async function getClientes(): Promise<Cliente[]> {
     return memoryStore.clientes;
   }
 }
+
+export async function addCliente(cliente: Cliente): Promise<Cliente> {
+  memoryStore.clientes.push(cliente);
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const row = [
+        cliente.id,
+        cliente.nombre,
+        cliente.pin,
+        cliente.telefono || "",
+        cliente.email || "",
+        cliente.agente_preferido || "",
+        cliente.notas || "",
+        cliente.fecha_registro || new Date().toISOString().split("T")[0],
+        String(cliente.activo ?? true),
+      ];
+      await client.sheets.spreadsheets.values.append({
+        spreadsheetId: client.sheetId,
+        range: "Clientes!A2:I",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+    } catch (err) {
+      console.error("Error al agregar cliente en Google Sheets:", err);
+    }
+  }
+  return cliente;
+}
+
+
 
 // ----------------------------------------------------
 // SERVICIOS
@@ -446,16 +517,65 @@ export async function updateAgenteDisponibilidad(
   disponible: boolean
 ): Promise<Agente | null> {
   const idx = memoryStore.agentes.findIndex((a) => a.id === agenteId);
-  if (idx === -1) return null;
-  memoryStore.agentes[idx].disponible_turnos = disponible;
-  return memoryStore.agentes[idx];
+  if (idx !== -1) {
+    memoryStore.agentes[idx].disponible_turnos = disponible;
+  }
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Agentes!A2:A",
+      });
+      const rows = res.data.values || [];
+      const rowIndex = rows.findIndex((r) => r[0] === agenteId);
+      if (rowIndex !== -1) {
+        const rowNum = rowIndex + 2;
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Agentes!O${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [[String(disponible)]] },
+        });
+      }
+    } catch (err) {
+      console.error("Error al actualizar disponibilidad en Google Sheets:", err);
+    }
+  }
+
+  return idx !== -1 ? memoryStore.agentes[idx] : null;
 }
 
 // ----------------------------------------------------
 // ASISTENCIA
 // ----------------------------------------------------
 export async function getAsistenciaHoy(fecha: string): Promise<AsistenciaRecord[]> {
-  return memoryStore.asistencia.filter((a) => a.fecha === fecha);
+  const client = getSheetsClient();
+  if (!client) return memoryStore.asistencia.filter((a) => a.fecha === fecha);
+
+  try {
+    const res = await client.sheets.spreadsheets.values.get({
+      spreadsheetId: client.sheetId,
+      range: "Asistencia!A2:F",
+    });
+    const rows = res.data.values || [];
+    if (rows.length === 0) return memoryStore.asistencia.filter((a) => a.fecha === fecha);
+
+    return rows
+      .filter((r) => r[0] === fecha)
+      .map((r) => ({
+        fecha: r[0] || "",
+        id_agente: r[1] || "",
+        nombre_agente: r[2] || "",
+        hora_checkin: r[3] || undefined,
+        hora_checkout: r[4] || undefined,
+        estado: (r[5] as any) || "presente",
+      }));
+  } catch (err) {
+    console.warn("Fallback a memoria para Asistencia:", err);
+    return memoryStore.asistencia.filter((a) => a.fecha === fecha);
+  }
 }
 
 export async function registrarAsistencia(record: AsistenciaRecord): Promise<AsistenciaRecord> {
@@ -470,6 +590,46 @@ export async function registrarAsistencia(record: AsistenciaRecord): Promise<Asi
     };
   } else {
     memoryStore.asistencia.push(record);
+  }
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Asistencia!A2:B",
+      });
+      const rows = res.data.values || [];
+      const rowIndex = rows.findIndex((r) => r[0] === record.fecha && r[1] === record.id_agente);
+
+      const rowValues = [
+        record.fecha,
+        record.id_agente,
+        record.nombre_agente,
+        record.hora_checkin || "",
+        record.hora_checkout || "",
+        record.estado,
+      ];
+
+      if (rowIndex !== -1) {
+        const rowNum = rowIndex + 2;
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Asistencia!A${rowNum}:F${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [rowValues] },
+        });
+      } else {
+        await client.sheets.spreadsheets.values.append({
+          spreadsheetId: client.sheetId,
+          range: "Asistencia!A2:F",
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [rowValues] },
+        });
+      }
+    } catch (err) {
+      console.error("Error al registrar Asistencia en Google Sheets:", err);
+    }
   }
 
   return record;
@@ -541,14 +701,72 @@ export async function updateSalonConfig(updates: Partial<SalonConfig>): Promise<
 // CITAS (Agenda de Clientes)
 // ----------------------------------------------------
 export async function getCitas(clienteId?: string): Promise<CitaRecord[]> {
-  if (clienteId) {
-    return memoryStore.citas.filter((c) => c.id_cliente === clienteId);
+  const client = getSheetsClient();
+  if (!client) {
+    return clienteId
+      ? memoryStore.citas.filter((c) => c.id_cliente === clienteId)
+      : memoryStore.citas;
   }
-  return memoryStore.citas;
+
+  try {
+    const res = await client.sheets.spreadsheets.values.get({
+      spreadsheetId: client.sheetId,
+      range: "Citas!A2:I",
+    });
+    const rows = res.data.values || [];
+    if (rows.length === 0) {
+      return clienteId
+        ? memoryStore.citas.filter((c) => c.id_cliente === clienteId)
+        : memoryStore.citas;
+    }
+
+    const citas: CitaRecord[] = rows.map((r) => ({
+      id: r[0] || "",
+      id_cliente: r[1] || "",
+      id_agente: r[2] || "",
+      id_servicio: r[3] || "",
+      fecha: r[4] || "",
+      hora: r[5] || "",
+      estado: (r[6] as any) || "confirmada",
+      creada_en: r[7] || "",
+      notas: r[8] || undefined,
+    }));
+
+    return clienteId ? citas.filter((c) => c.id_cliente === clienteId) : citas;
+  } catch (err) {
+    console.warn("Fallback a memoria para Citas:", err);
+    return clienteId
+      ? memoryStore.citas.filter((c) => c.id_cliente === clienteId)
+      : memoryStore.citas;
+  }
 }
 
 export async function addCita(cita: CitaRecord): Promise<CitaRecord> {
   memoryStore.citas.push(cita);
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const row = [
+        cita.id,
+        cita.id_cliente,
+        cita.id_agente,
+        cita.id_servicio,
+        cita.fecha,
+        cita.hora,
+        cita.estado,
+        cita.creada_en,
+        cita.notas || "",
+      ];
+      await client.sheets.spreadsheets.values.append({
+        spreadsheetId: client.sheetId,
+        range: "Citas!A2:I",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+    } catch (err) {
+      console.error("Error al registrar Cita en Google Sheets:", err);
+    }
+  }
   return cita;
 }
 
@@ -557,21 +775,99 @@ export async function updateCita(
   updates: Partial<CitaRecord>
 ): Promise<CitaRecord | null> {
   const idx = memoryStore.citas.findIndex((c) => c.id === id);
-  if (idx === -1) return null;
-  memoryStore.citas[idx] = { ...memoryStore.citas[idx], ...updates };
-  return memoryStore.citas[idx];
+  if (idx !== -1) {
+    memoryStore.citas[idx] = { ...memoryStore.citas[idx], ...updates };
+  }
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Citas!A2:I",
+      });
+      const rows = res.data.values || [];
+      const rowIndex = rows.findIndex((r) => r[0] === id);
+      if (rowIndex !== -1) {
+        const rowNum = rowIndex + 2;
+        const current = rows[rowIndex];
+        const updatedRow = [
+          current[0],
+          current[1],
+          current[2],
+          current[3],
+          updates.fecha !== undefined ? updates.fecha : current[4],
+          updates.hora !== undefined ? updates.hora : current[5],
+          updates.estado !== undefined ? updates.estado : current[6],
+          current[7],
+          updates.notas !== undefined ? (updates.notas || "") : (current[8] || ""),
+        ];
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Citas!A${rowNum}:I${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [updatedRow] },
+        });
+      }
+    } catch (err) {
+      console.error("Error al actualizar Cita en Google Sheets:", err);
+    }
+  }
+
+  return idx !== -1 ? memoryStore.citas[idx] : null;
 }
 
 // ----------------------------------------------------
 // HISTORIAL DE CLIENTE (Borrador + OATC histórico)
 // ----------------------------------------------------
-// ----------------------------------------------------
-// HISTORIAL DE CLIENTE (Borrador + OATC histórico)
-// ----------------------------------------------------
 export async function getHistorialCliente(clienteId: string): Promise<BorradorEntry[]> {
-  const enBorrador = memoryStore.borrador.filter((b) => b.id_cliente === clienteId);
-  const enOATC = memoryStore.oatc.filter((o) => o.id_cliente === clienteId);
-  return [...enBorrador, ...enOATC];
+  const [enBorrador, client] = await Promise.all([
+    getBorrador(),
+    Promise.resolve(getSheetsClient()),
+  ]);
+
+  const filtradosBorrador = enBorrador.filter((b) => b.id_cliente === clienteId);
+
+  let historicoOATC: BorradorEntry[] = [];
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "OATC!A2:T",
+      });
+      const rows = res.data.values || [];
+      historicoOATC = rows
+        .filter((r) => r[4] === clienteId)
+        .map((r) => ({
+          id_oatc: r[0] || "",
+          fecha: r[1] || "",
+          hora_inicio: r[2] || "",
+          tipo_consumidor: (r[3] as any) || "turno",
+          id_cliente: r[4] || undefined,
+          nombre_consumidor: r[5] || "",
+          id_agente: r[6] || "",
+          nombre_agente: r[7] || "",
+          id_servicio: r[8] || "",
+          nombre_servicio: r[9] || "",
+          etapa: (r[10] as any) || "completada",
+          precio_final: Number(r[11]) || 0,
+          productos_usados: r[12] || "",
+          insumos_usados: r[13] || "",
+          productos_vendidos: r[14] || "",
+          correlativo_sistema: r[15] || "",
+          comprobante_externo: r[16] || "",
+          notas: r[17] || "",
+          hora_fin: r[18] || "",
+        }));
+    } catch (err) {
+      console.warn("Fallback a memoria para historial OATC:", err);
+      historicoOATC = memoryStore.oatc.filter((o) => o.id_cliente === clienteId);
+    }
+  } else {
+    historicoOATC = memoryStore.oatc.filter((o) => o.id_cliente === clienteId);
+  }
+
+  return [...filtradosBorrador, ...historicoOATC];
 }
 
 // ----------------------------------------------------
@@ -590,7 +886,7 @@ export async function ejecutarCierreDeDia(): Promise<ResumenCierre> {
   const fechaHoy = new Date().toISOString().split("T")[0];
   const timestamp = new Date().toISOString();
 
-  const oatcsAMigrar = [...memoryStore.borrador];
+  const oatcsAMigrar = await getBorrador();
   const totalVentas = oatcsAMigrar.reduce(
     (acc, curr) => acc + (Number(curr.precio_final) || 0),
     0
