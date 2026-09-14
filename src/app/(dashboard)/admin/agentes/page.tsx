@@ -302,6 +302,11 @@ export default function AdminAgentesPage() {
             // Regla: Requiere activo + disponible_turnos + check-in de asistencia hoy
             const elegibleTurnosReal = a.activo && a.disponible_turnos && estaPresente;
 
+            // Orden anómala en Borrador por finalización temprana
+            const ordenAnomala = borrador.find(
+              (b) => b.id_agente === a.id && b.alerta_tiempo_anomalo
+            );
+
             return (
               <div
                 key={a.id}
@@ -364,7 +369,7 @@ export default function AdminAgentesPage() {
                 </div>
 
                 {/* Bloque de Estados Sincronizados en Tiempo Real */}
-                <div className="pt-3 border-t border-earth-100 dark:border-earth-800/80 space-y-2 text-xs">
+                <div className="pt-3 border-t border-earth-100 dark:border-earth-800/80 space-y-2.5 text-xs">
                   {/* 1. Estado de Asistencia (Hoja Asistencia) */}
                   <div className="flex items-center justify-between">
                     <span className="text-earth-500 text-[11px]">Asistencia:</span>
@@ -432,8 +437,11 @@ export default function AdminAgentesPage() {
                           Habilitado
                         </span>
                       ) : !a.disponible_turnos ? (
-                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                          Pausado
+                        <span
+                          className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1"
+                          title={ordenAnomala ? `Pausado por finalización temprana: ${ordenAnomala.motivo_finalizacion_temprana}` : "Pausado manualmente"}
+                        >
+                          {ordenAnomala ? "⚠️ Pausado (Antifraude)" : "Pausado"}
                         </span>
                       ) : (
                         <span
@@ -458,7 +466,7 @@ export default function AdminAgentesPage() {
                         title={
                           a.disponible_turnos
                             ? "Hacer clic para pausar recepción de turnos"
-                            : "Hacer clic para habilitar recepción de turnos"
+                            : "Hacer clic para reactivar recepción de turnos"
                         }
                       >
                         {updatingId === a.id ? (
@@ -471,6 +479,22 @@ export default function AdminAgentesPage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* 4. Banner Alerta Antifraude si aplica */}
+                  {ordenAnomala && (
+                    <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-[10px] text-amber-900 dark:text-amber-300">
+                      <p className="font-bold flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>Alerta Antifraude: Finalización Temprana</span>
+                      </p>
+                      <p className="text-earth-600 dark:text-earth-400 mt-1">
+                        Duración: <strong>{ordenAnomala.duracion_real_minutos} min</strong> (estimada: {ordenAnomala.duracion_estimada_minutos} min).
+                      </p>
+                      <p className="text-earth-700 dark:text-earth-300 mt-0.5 truncate" title={ordenAnomala.motivo_finalizacion_temprana}>
+                        Motivo: <em>{ordenAnomala.motivo_finalizacion_temprana}</em>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             );

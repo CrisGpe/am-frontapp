@@ -4,9 +4,12 @@ import {
   addBorradorEntry,
   updateBorradorEntry,
   descontarInventarioPorAtencion,
+  getServicios,
+  updateAgenteDisponibilidad,
 } from "@/lib/google-sheets";
 import { getCurrentUser } from "@/lib/auth";
 import { BorradorEntry } from "@/lib/types";
+import { getCurrentTimeString, evaluarFinalizacionTemprana } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +76,61 @@ export async function PATCH(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // Regla Antifraude: Control de Finalización Temprana y Protección de Cola de Turnos
+    if (updates.etapa === "fin_atencion") {
+      const borradorActual = await getBorrador();
+      const existingEntry = borradorActual.find((e) => e.id_oatc === id_oatc);
+
+      if (existingEntry) {
+        const horaFin = updates.hora_fin || getCurrentTimeString("America/Lima");
+        updates.hora_fin = horaFin;
+
+        // Obtener la duración estimada del servicio para contrastar
+        const servicios = await getServicios();
+        const servicio = servicios.find((s) => s.id === existingEntry.id_servicio);
+        const duracionEstimadaMin = servicio?.duracion_min || 45;
+
+        const evaluacion = evaluarFinalizacionTemprana(
+          existingEntry.hora_inicio,
+          horaFin,
+          duracionEstimadaMin
+        );
+
+        if (evaluacion.esTemprana) {
+          const motivo = (updates.motivo_finalizacion_temprana || "").trim();
+          if (!motivo) {
+            return NextResponse.json(
+              {
+                error: `Finalización antes del tiempo mínimo (${evaluacion.duracionReal} min transcurridos vs umbral de ${evaluacion.umbralMin} min). Debe ingresar una justificación válida para continuar.`,
+                requiereJustificacion: true,
+                duracionReal: evaluacion.duracionReal,
+                umbralMin: evaluacion.umbralMin,
+                duracionEstimada: duracionEstimadaMin,
+              },
+              { status: 400 }
+            );
+          }
+
+          // Registrar banderas de auditoría en la orden
+          updates.alerta_tiempo_anomalo = true;
+          updates.duracion_real_minutos = evaluacion.duracionReal;
+          updates.duracion_estimada_minutos = duracionEstimadaMin;
+          updates.motivo_finalizacion_temprana = motivo;
+
+          // ACCIÓN ANTIFRAUDE INMEDIATA: Pausar recepción de turnos del colaborador
+          try {
+            await updateAgenteDisponibilidad(existingEntry.id_agente, false);
+          } catch (pauseErr) {
+            console.error("Error al pausar agente tras finalización temprana:", pauseErr);
+          }
+        } else {
+          updates.alerta_tiempo_anomalo = false;
+          updates.duracion_real_minutos = evaluacion.duracionReal;
+          updates.duracion_estimada_minutos = duracionEstimadaMin;
+        }
+      }
     }
 
     const updated = await updateBorradorEntry(id_oatc, updates);

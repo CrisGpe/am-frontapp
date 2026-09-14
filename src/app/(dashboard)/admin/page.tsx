@@ -25,6 +25,7 @@ import {
   FileSpreadsheet,
   Archive,
   Receipt,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { CobranzaModal } from "@/components/oatc/CobranzaModal";
@@ -361,9 +362,20 @@ export default function AdminDashboardPage() {
                             <td className="p-3">{row.nombre_agente}</td>
                             <td className="p-3 font-medium">{row.nombre_servicio}</td>
                             <td className="p-3">
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-earth-100 dark:bg-earth-800 text-earth-800 dark:text-cream-200">
-                                {row.etapa}
-                              </span>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-earth-100 dark:bg-earth-800 text-earth-800 dark:text-cream-200">
+                                  {row.etapa}
+                                </span>
+                                {row.alerta_tiempo_anomalo && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
+                                    title={`Finalización prematura: duró ${row.duracion_real_minutos} min vs ${row.duracion_estimada_minutos} min estimados. Motivo: ${row.motivo_finalizacion_temprana}`}
+                                  >
+                                    <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                                    <span>⚠️ {row.duracion_real_minutos}m (Temprana)</span>
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3 font-mono text-earth-600">
                               {row.comprobante_externo || "--"}

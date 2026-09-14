@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { BorradorEntry, EtapaOATC, UserSession } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { BorradorEntry, EtapaOATC, Servicio, UserSession } from "@/lib/types";
+import { formatCurrency, evaluarFinalizacionTemprana, getCurrentTimeString } from "@/lib/utils";
 import { CobranzaModal } from "@/components/oatc/CobranzaModal";
 import { NuevaOATCModal } from "@/components/oatc/NuevaOATCModal";
+import { ModalJustificacionTemprana } from "@/components/oatc/ModalJustificacionTemprana";
 import {
   Scissors,
   Clock,
@@ -18,11 +19,13 @@ import {
   Receipt,
   CheckCircle2,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function AgenteDashboardPage() {
   const [user, setUser] = useState<UserSession | null>(null);
   const [oatcs, setOatcs] = useState<BorradorEntry[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroEtapa, setFiltroEtapa] = useState<string>("todas");
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +34,15 @@ export default function AgenteDashboardPage() {
   // Modales
   const [cobranzaOatc, setCobranzaOatc] = useState<BorradorEntry | null>(null);
   const [nuevaOatcOpen, setNuevaOatcOpen] = useState(false);
+
+  // Modal de Justificación Antifraude por Finalización Temprana
+  const [modalTempranaData, setModalTempranaData] = useState<{
+    oatc: BorradorEntry;
+    duracionReal: number;
+    umbralMin: number;
+    duracionEstimada: number;
+  } | null>(null);
+  const [submittingTemprana, setSubmittingTemprana] = useState(false);
 
   useEffect(() => {
     cargarSesion();
@@ -51,20 +63,31 @@ export default function AgenteDashboardPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/borrador");
-      const data = await res.json();
-      if (data.borrador) {
-        setOatcs(data.borrador);
+      const [resBorrador, resServicios] = await Promise.all([
+        fetch("/api/borrador"),
+        fetch("/api/servicios"),
+      ]);
+      const dataBorrador = await resBorrador.json();
+      const dataServicios = await resServicios.json();
+      if (dataBorrador.borrador) {
+        setOatcs(dataBorrador.borrador);
+      }
+      if (dataServicios.servicios) {
+        setServicios(dataServicios.servicios);
       }
     } catch (err) {
-      setError("Error cargando borrador");
+      setError("Error cargando datos operativos");
       console.error("Error cargando borrador:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCambiarEtapa = async (id_oatc: string, nuevaEtapa: EtapaOATC) => {
+  const handleCambiarEtapa = async (
+    id_oatc: string,
+    nuevaEtapa: EtapaOATC,
+    extraUpdates?: Partial<BorradorEntry>
+  ) => {
     try {
       setUpdatingOatc(id_oatc);
       setError(null);
@@ -73,7 +96,7 @@ export default function AgenteDashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id_oatc,
-          updates: { etapa: nuevaEtapa },
+          updates: { etapa: nuevaEtapa, ...extraUpdates },
         }),
       });
 
@@ -88,6 +111,42 @@ export default function AgenteDashboardPage() {
       console.error("Error cambiando etapa:", err);
     } finally {
       setUpdatingOatc(null);
+    }
+  };
+
+  // Validación Antifraude antes de pasar a "fin_atencion"
+  const handleIntentarFinalizar = (oatc: BorradorEntry) => {
+    const servicio = servicios.find((s) => s.id === oatc.id_servicio);
+    const duracionEstimada = servicio?.duracion_min || 45;
+    const horaActual = getCurrentTimeString("America/Lima");
+    const evaluacion = evaluarFinalizacionTemprana(
+      oatc.hora_inicio,
+      horaActual,
+      duracionEstimada
+    );
+
+    if (evaluacion.esTemprana) {
+      setModalTempranaData({
+        oatc,
+        duracionReal: evaluacion.duracionReal,
+        umbralMin: evaluacion.umbralMin,
+        duracionEstimada,
+      });
+    } else {
+      handleCambiarEtapa(oatc.id_oatc, "fin_atencion");
+    }
+  };
+
+  const handleConfirmarTemprana = async (motivo: string) => {
+    if (!modalTempranaData) return;
+    try {
+      setSubmittingTemprana(true);
+      await handleCambiarEtapa(modalTempranaData.oatc.id_oatc, "fin_atencion", {
+        motivo_finalizacion_temprana: motivo,
+      });
+      setModalTempranaData(null);
+    } finally {
+      setSubmittingTemprana(false);
     }
   };
 
@@ -311,7 +370,7 @@ export default function AgenteDashboardPage() {
 
                   {oatc.etapa === "atencion" && (
                     <button
-                      onClick={() => handleCambiarEtapa(oatc.id_oatc, "fin_atencion")}
+                      onClick={() => handleIntentarFinalizar(oatc)}
                       disabled={updatingOatc === oatc.id_oatc}
                       className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
                     >
@@ -370,6 +429,20 @@ export default function AgenteDashboardPage() {
             id: user?.userId || "",
             nombre: user?.nombre || "Colaborador",
           }}
+        />
+      )}
+
+      {/* Modal Justificación Antifraude por Finalización Temprana */}
+      {modalTempranaData && (
+        <ModalJustificacionTemprana
+          isOpen={!!modalTempranaData}
+          onClose={() => setModalTempranaData(null)}
+          oatc={modalTempranaData.oatc}
+          duracionReal={modalTempranaData.duracionReal}
+          umbralMin={modalTempranaData.umbralMin}
+          duracionEstimada={modalTempranaData.duracionEstimada}
+          onConfirm={handleConfirmarTemprana}
+          loading={submittingTemprana}
         />
       )}
     </div>

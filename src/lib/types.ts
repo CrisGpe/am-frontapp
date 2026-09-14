@@ -93,6 +93,10 @@ export interface BorradorEntry {
   comprobante_externo?: string;
   notas?: string;
   hora_fin?: string;
+  alerta_tiempo_anomalo?: boolean;
+  duracion_real_minutos?: number;
+  duracion_estimada_minutos?: number;
+  motivo_finalizacion_temprana?: string;
 }
 
 export interface OATCRecord extends BorradorEntry {

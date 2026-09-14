@@ -9,7 +9,7 @@ export async function getBorrador(): Promise<BorradorEntry[]> {
   try {
     const res = await client.sheets.spreadsheets.values.get({
       spreadsheetId: client.sheetId,
-      range: "Borrador!A2:S",
+      range: "Borrador!A2:W",
     });
     const rows = res.data.values || [];
     if (rows.length === 0) return [];
@@ -34,6 +34,10 @@ export async function getBorrador(): Promise<BorradorEntry[]> {
       comprobante_externo: r[16] || "",
       notas: r[17] || "",
       hora_fin: r[18] || "",
+      alerta_tiempo_anomalo: r[19] === "TRUE" || r[19] === "true",
+      duracion_real_minutos: r[20] ? Number(r[20]) : undefined,
+      duracion_estimada_minutos: r[21] ? Number(r[21]) : undefined,
+      motivo_finalizacion_temprana: r[22] || undefined,
     }));
   } catch (err) {
     console.warn("Fallback a memoria para Borrador:", err);
@@ -68,11 +72,15 @@ export async function addBorradorEntry(entry: BorradorEntry): Promise<BorradorEn
       entry.comprobante_externo || "",
       entry.notas || "",
       entry.hora_fin || "",
+      entry.alerta_tiempo_anomalo ? "TRUE" : "FALSE",
+      entry.duracion_real_minutos != null ? String(entry.duracion_real_minutos) : "",
+      entry.duracion_estimada_minutos != null ? String(entry.duracion_estimada_minutos) : "",
+      entry.motivo_finalizacion_temprana || "",
     ];
 
     await client.sheets.spreadsheets.values.append({
       spreadsheetId: client.sheetId,
-      range: "Borrador!A2:S",
+      range: "Borrador!A2:W",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [row] },
     });
@@ -146,10 +154,14 @@ export async function updateBorradorEntry(
           updated.comprobante_externo || "",
           updated.notas || "",
           updated.hora_fin || "",
+          updated.alerta_tiempo_anomalo ? "TRUE" : "FALSE",
+          updated.duracion_real_minutos != null ? String(updated.duracion_real_minutos) : "",
+          updated.duracion_estimada_minutos != null ? String(updated.duracion_estimada_minutos) : "",
+          updated.motivo_finalizacion_temprana || "",
         ];
         await client.sheets.spreadsheets.values.update({
           spreadsheetId: client.sheetId,
-          range: `Borrador!A${rowNum}:S${rowNum}`,
+          range: `Borrador!A${rowNum}:W${rowNum}`,
           valueInputOption: "USER_ENTERED",
           requestBody: { values: [rowValues] },
         });
