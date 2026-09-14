@@ -54,15 +54,15 @@ export function getCurrentTimeString(timeZone: string = "America/Lima"): string 
  * Av. Horacio Urteaga, Jesús María, Lima, Perú.
  */
 export const SALON_COORDS = {
-  lat: -12.0725,
-  lng: -77.0485,
+  lat: -12.073188,
+  lng: -77.05192,
   direccion: "Av. Horacio Urteaga, Jesús María, Lima",
 };
 
 /**
  * Radio de tolerancia en metros para validar presencia física dentro del local
  */
-export const SALON_RADIO_METROS = 70;
+export const SALON_RADIO_METROS = 50;
 
 /**
  * Calcula la distancia ortodrómica en metros entre dos puntos geográficos (Fórmula de Haversine)

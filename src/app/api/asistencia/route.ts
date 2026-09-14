@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { tipoAccion, fecha, hora, ubicacion } = body; // 'checkin' | 'checkout'
+    const { tipoAccion, fecha, hora, ubicacion, permitirReintento } = body; // 'checkin' | 'checkout'
     const config = await getSalonConfig();
     const tz = config.zona_horaria || "America/Lima";
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const miRegistro = registros.find((r) => r.id_agente === user.userId);
 
     if (tipoAccion === "checkin") {
-      if (miRegistro && miRegistro.hora_checkin) {
+      if (miRegistro && miRegistro.hora_checkin && !permitirReintento) {
         return NextResponse.json(
           { error: "Ya registraste tu check-in hoy" },
           { status: 400 }
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         fecha: hoy,
         id_agente: user.userId,
         nombre_agente: user.nombre,
-        hora_checkin: horaActual,
+        hora_checkin: miRegistro?.hora_checkin || horaActual,
         estado: "presente",
         latitud,
         longitud,

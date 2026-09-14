@@ -2,7 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { AsistenciaRecord, UserSession } from "@/lib/types";
-import { getCurrentTimeString, getTodayDateString } from "@/lib/utils";
+import {
+  getCurrentTimeString,
+  getTodayDateString,
+  calcularDistanciaMetros,
+  SALON_COORDS,
+  SALON_RADIO_METROS,
+} from "@/lib/utils";
 import {
   Calendar,
   Clock,
@@ -13,7 +19,37 @@ import {
   MapPin,
   AlertTriangle,
   ShieldCheck,
+  Compass,
+  Sliders,
+  RotateCcw,
 } from "lucide-react";
+
+const COORD_PRESETS = [
+  {
+    id: "real",
+    nombre: "📍 GPS Real del Dispositivo",
+    descripcion: "Sensor nativo del navegador / móvil",
+    coords: null,
+  },
+  {
+    id: "salon",
+    nombre: "🏢 En el Salón Élite (<= 50m)",
+    descripcion: "-12.073188, -77.05192 (Distancia: ~0m)",
+    coords: { lat: -12.073188, lng: -77.05192 },
+  },
+  {
+    id: "prueba_usuario",
+    nombre: "🧪 Coordenada de Prueba (~905m)",
+    descripcion: "-12.0749366, -77.0600519 (Fuera de rango)",
+    coords: { lat: -12.0749366, lng: -77.0600519 },
+  },
+  {
+    id: "custom",
+    nombre: "✏️ Coordenadas Personalizadas",
+    descripcion: "Ingresar latitud y longitud manual",
+    coords: null,
+  },
+];
 
 export default function AsistenciaPage() {
   const [user, setUser] = useState<UserSession | null>(null);
@@ -24,6 +60,12 @@ export default function AsistenciaPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string>("");
   const [mounted, setMounted] = useState(false);
+
+  // Selector y modo de pruebas GPS
+  const [selectedPreset, setSelectedPreset] = useState<string>("prueba_usuario");
+  const [customLat, setCustomLat] = useState<string>("-12.0749366");
+  const [customLng, setCustomLng] = useState<string>("-77.0600519");
+  const [showTestPanel, setShowTestPanel] = useState<boolean>(true);
 
   useEffect(() => {
     setMounted(true);
@@ -58,11 +100,39 @@ export default function AsistenciaPage() {
     }
   };
 
-  const obtenerUbicacionGPS = (): Promise<{
+  const resolverCoordenadasActivas = async (): Promise<{
     latitud: number;
     longitud: number;
     precision: number;
   } | null> => {
+    if (selectedPreset === "salon") {
+      return {
+        latitud: SALON_COORDS.lat,
+        longitud: SALON_COORDS.lng,
+        precision: 10,
+      };
+    }
+
+    if (selectedPreset === "prueba_usuario") {
+      return {
+        latitud: -12.0749366,
+        longitud: -77.0600519,
+        precision: 10,
+      };
+    }
+
+    if (selectedPreset === "custom") {
+      const lat = parseFloat(customLat);
+      const lng = parseFloat(customLng);
+      if (isNaN(lat) || isNaN(lng)) return null;
+      return {
+        latitud: lat,
+        longitud: lng,
+        precision: 10,
+      };
+    }
+
+    // GPS real del dispositivo
     return new Promise((resolve) => {
       if (typeof window === "undefined" || !("geolocation" in navigator)) {
         resolve(null);
@@ -78,7 +148,6 @@ export default function AsistenciaPage() {
           });
         },
         () => {
-          // Permiso denegado o timeout
           resolve(null);
         },
         { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
@@ -86,13 +155,44 @@ export default function AsistenciaPage() {
     });
   };
 
-  const handleMarcar = async (tipoAccion: "checkin" | "checkout") => {
+  // Cálculo de distancia previa para mostrar en el simulador
+  const getDistanciaEstimada = (): { distancia: number | null; fueraDeRango: boolean } => {
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    if (selectedPreset === "salon") {
+      lat = SALON_COORDS.lat;
+      lng = SALON_COORDS.lng;
+    } else if (selectedPreset === "prueba_usuario") {
+      lat = -12.0749366;
+      lng = -77.0600519;
+    } else if (selectedPreset === "custom") {
+      const pLat = parseFloat(customLat);
+      const pLng = parseFloat(customLng);
+      if (!isNaN(pLat) && !isNaN(pLng)) {
+        lat = pLat;
+        lng = pLng;
+      }
+    }
+
+    if (lat != null && lng != null) {
+      const d = calcularDistanciaMetros(lat, lng);
+      return { distancia: d, fueraDeRango: d > SALON_RADIO_METROS };
+    }
+
+    return { distancia: null, fueraDeRango: false };
+  };
+
+  const handleMarcar = async (
+    tipoAccion: "checkin" | "checkout",
+    permitirReintento: boolean = false
+  ) => {
     setActionLoading(true);
     setError(null);
     setGpsStatus("Comprobando presencia física en el salón (GPS)...");
 
     try {
-      const ubicacion = await obtenerUbicacionGPS();
+      const ubicacion = await resolverCoordenadasActivas();
       setGpsStatus("Enviando registro al sistema...");
 
       const hoyLocal = getTodayDateString();
@@ -105,6 +205,7 @@ export default function AsistenciaPage() {
           fecha: hoyLocal,
           hora: horaLocal,
           ubicacion,
+          permitirReintento,
         }),
       });
 
@@ -127,6 +228,7 @@ export default function AsistenciaPage() {
   };
 
   const miRegistro = asistencia.find((a) => a.id_agente === user?.userId);
+  const estimada = getDistanciaEstimada();
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -157,13 +259,135 @@ export default function AsistenciaPage() {
         </div>
       </div>
 
+      {/* Panel de Pruebas y Simulación GPS */}
+      <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl p-5 sm:p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-2 pb-3 border-b border-earth-100 dark:border-earth-800">
+          <div className="flex items-center gap-2">
+            <Compass className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-sm sm:text-base font-bold text-earth-900 dark:text-cream-100">
+              Simulador y Pruebas de Geocercado (Tolerancia: {SALON_RADIO_METROS}m)
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTestPanel(!showTestPanel)}
+            className="text-xs text-earth-500 hover:text-earth-700 dark:hover:text-cream-200 flex items-center gap-1 font-medium"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>{showTestPanel ? "Ocultar opciones" : "Mostrar opciones"}</span>
+          </button>
+        </div>
+
+        {showTestPanel && (
+          <div className="pt-4 space-y-4">
+            <div className="text-xs text-earth-600 dark:text-earth-400 space-y-1">
+              <p>
+                <strong>Coordenadas Oficiales Salón Élite:</strong>{" "}
+                <code className="bg-earth-100 dark:bg-earth-800 px-1.5 py-0.5 rounded font-mono text-[11px]">
+                  {SALON_COORDS.lat}, {SALON_COORDS.lng}
+                </code>{" "}
+                ({SALON_COORDS.direccion})
+              </p>
+              <p>
+                <strong>Radio de Tolerancia:</strong> {SALON_RADIO_METROS} metros. Si el agente marca a más de {SALON_RADIO_METROS}m, se activa la alerta de auditoría.
+              </p>
+            </div>
+
+            {/* Presets */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {COORD_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setSelectedPreset(preset.id)}
+                  className={`text-left p-3 rounded-2xl border transition-all ${
+                    selectedPreset === preset.id
+                      ? "bg-earth-100 dark:bg-earth-800 border-earth-400 dark:border-amber-400/60 shadow-xs"
+                      : "bg-earth-50/50 dark:bg-earth-950/40 border-earth-200/70 dark:border-earth-800 hover:border-earth-300"
+                  }`}
+                >
+                  <span className="font-bold text-xs text-earth-900 dark:text-cream-100 block">
+                    {preset.nombre}
+                  </span>
+                  <span className="text-[11px] text-earth-500 block mt-0.5">
+                    {preset.descripcion}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Input para Custom */}
+            {selectedPreset === "custom" && (
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-earth-50 dark:bg-earth-950 border border-earth-200 dark:border-earth-800">
+                <div>
+                  <label className="text-[11px] font-semibold text-earth-600 dark:text-earth-400 block mb-1">
+                    Latitud
+                  </label>
+                  <input
+                    type="text"
+                    value={customLat}
+                    onChange={(e) => setCustomLat(e.target.value)}
+                    placeholder="-12.0749366"
+                    className="w-full text-xs font-mono p-2 rounded-xl border border-earth-300 dark:border-earth-700 bg-white dark:bg-earth-900 text-earth-900 dark:text-cream-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-earth-600 dark:text-earth-400 block mb-1">
+                    Longitud
+                  </label>
+                  <input
+                    type="text"
+                    value={customLng}
+                    onChange={(e) => setCustomLng(e.target.value)}
+                    placeholder="-77.0600519"
+                    className="w-full text-xs font-mono p-2 rounded-xl border border-earth-300 dark:border-earth-700 bg-white dark:bg-earth-900 text-earth-900 dark:text-cream-100"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Preview de Validación en Tiempo Real */}
+            <div className="p-3.5 rounded-2xl bg-earth-50 dark:bg-earth-950/60 border border-earth-200 dark:border-earth-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="text-[11px] text-earth-500 block">Distancia calculada al Salón:</span>
+                <span className="font-bold text-sm text-earth-900 dark:text-cream-100">
+                  {estimada.distancia != null
+                    ? `${estimada.distancia} metros`
+                    : "Obtenida al marcar vía GPS"}
+                </span>
+              </div>
+
+              <div>
+                {estimada.distancia != null ? (
+                  estimada.fueraDeRango ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      ⚠️ Excede 50m (Activa alerta de auditoría)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                      <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                      ✅ Dentro de 50m (Ubicación Válida)
+                    </span>
+                  )
+                ) : (
+                  <span className="text-xs text-earth-500 italic">
+                    Sensor satelital en espera
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Tarjeta de Marcaje Personal */}
       <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl p-6 sm:p-8 shadow-sm text-center">
         <h2 className="text-lg font-bold text-earth-900 dark:text-cream-100 mb-1">
           Estado de {user?.nombre || "Colaborador"}
         </h2>
         <p className="text-xs text-earth-500 mb-4">
-          La geolocalización de tu móvil valida tu presencia dentro del salón para activar tus turnos.
+          La geolocalización valida tu presencia dentro del salón (radio {SALON_RADIO_METROS}m) para habilitar tus turnos.
         </p>
 
         {loading ? (
@@ -232,18 +456,47 @@ export default function AsistenciaPage() {
                   <LogOut className="w-4 h-4" />
                   {actionLoading ? "Registrando salida..." : "Registrar Salida (Check-Out)"}
                 </button>
+
+                {/* Botón para Re-probar Check-in en modo pruebas */}
+                <button
+                  type="button"
+                  onClick={() => handleMarcar("checkin", true)}
+                  disabled={actionLoading}
+                  className="w-full py-2.5 rounded-xl border border-earth-300 dark:border-earth-700 bg-earth-50 dark:bg-earth-800 hover:bg-earth-100 dark:hover:bg-earth-750 text-earth-700 dark:text-cream-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-earth-500" />
+                  <span>Re-probar Check-In con opción activa</span>
+                </button>
               </div>
             ) : (
-              <div className="p-6 rounded-2xl bg-cream-100 dark:bg-earth-950 border border-earth-200 dark:border-earth-800 text-earth-800 dark:text-cream-200 space-y-2">
+              <div className="p-6 rounded-2xl bg-cream-100 dark:bg-earth-950 border border-earth-200 dark:border-earth-800 text-earth-800 dark:text-cream-200 space-y-3">
                 <CheckCircle2 className="w-8 h-8 text-sage-500 mx-auto" />
                 <h3 className="font-bold text-sm">Jornada Completada</h3>
                 <p className="text-xs text-earth-600 dark:text-earth-400">
                   Entrada: <strong>{miRegistro.hora_checkin} hrs</strong> | Salida:{" "}
                   <strong>{miRegistro.hora_checkout} hrs</strong>
                 </p>
-                <p className="text-[11px] text-earth-500">
-                  Tu jornada ha sido registrada y guardada en tiempo real en la hoja Asistencia.
-                </p>
+
+                {miRegistro.alerta_ubicacion ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
+                    ⚠️ Registrado fuera de local ({miRegistro.distancia_metros}m)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                    ✅ Verificado en Salón ({miRegistro.distancia_metros}m)
+                  </span>
+                )}
+
+                {/* Botón para Re-probar Check-in en modo pruebas */}
+                <button
+                  type="button"
+                  onClick={() => handleMarcar("checkin", true)}
+                  disabled={actionLoading}
+                  className="w-full mt-2 py-2.5 rounded-xl border border-earth-300 dark:border-earth-700 bg-earth-50 dark:bg-earth-800 hover:bg-earth-100 dark:hover:bg-earth-750 text-earth-700 dark:text-cream-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-earth-500" />
+                  <span>Re-probar Check-In con opción activa</span>
+                </button>
               </div>
             )}
 
