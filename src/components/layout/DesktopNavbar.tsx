@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { Sparkles, LogOut, LucideIcon } from "lucide-react";
+import { Sparkles, LogOut, PanelLeft, LucideIcon } from "lucide-react";
 import { UserSession } from "@/lib/types";
 
 interface NavLinkItem {
@@ -14,6 +14,7 @@ interface DesktopNavbarProps {
   pathname: string;
   links: NavLinkItem[];
   sheetsConnected: boolean | null;
+  onSwitchLayout: () => void;
   onLogout: () => void;
 }
 
@@ -22,6 +23,7 @@ export function DesktopNavbar({
   pathname,
   links,
   sheetsConnected,
+  onSwitchLayout,
   onLogout,
 }: DesktopNavbarProps) {
   return (
@@ -42,7 +44,7 @@ export function DesktopNavbar({
       </div>
 
       {/* Nav Links */}
-      <nav className="flex items-center gap-1">
+      <nav className="flex items-center gap-1 overflow-x-auto py-1">
         {links.map((link) => {
           const Icon = link.icon;
           const isActive = pathname === link.href;
@@ -51,13 +53,13 @@ export function DesktopNavbar({
               key={link.href}
               href={link.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3 py-1.5 rounded-xl text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${
                 isActive
-                  ? "bg-earth-100 dark:bg-earth-800 text-earth-900 dark:text-cream-100"
+                  ? "bg-earth-100 dark:bg-earth-800 text-earth-900 dark:text-cream-100 font-semibold"
                   : "text-earth-600 dark:text-earth-400 hover:text-earth-900 dark:hover:text-cream-200 hover:bg-earth-50 dark:hover:bg-earth-900/50"
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4 h-4 shrink-0" />
               {link.label}
             </Link>
           );
@@ -65,14 +67,25 @@ export function DesktopNavbar({
       </nav>
 
       {/* Actions and Status */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+        {/* Switch to Sidebar Button */}
+        <button
+          onClick={onSwitchLayout}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-earth-700 dark:text-cream-200 hover:bg-earth-100 dark:hover:bg-earth-800 border border-earth-200 dark:border-earth-800 transition-colors"
+          title="Cambiar disposición a barra lateral"
+          aria-label="Cambiar disposición a barra lateral"
+        >
+          <PanelLeft className="w-4 h-4 text-earth-500 dark:text-earth-400" />
+          <span className="hidden xl:inline">Barra Lateral</span>
+        </button>
+
         {sheetsConnected === true && (
           <span
             title="Sincronizado con Google Sheets en tiempo real"
             className="inline-flex text-[11px] items-center gap-1.5 px-2.5 py-1 rounded-full font-bold bg-sage-50 text-sage-700 border border-sage-200 dark:bg-sage-950 dark:text-sage-300 dark:border-sage-800"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-sage-500" />
-            Sheets Conectado
+            <span className="hidden lg:inline">Sheets Conectado</span>
           </span>
         )}
         {sheetsConnected === false && (
@@ -81,7 +94,7 @@ export function DesktopNavbar({
             className="inline-flex text-[11px] items-center gap-1.5 px-2.5 py-1 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            Sheets en Memoria
+            <span className="hidden lg:inline">Sheets en Memoria</span>
           </span>
         )}
 

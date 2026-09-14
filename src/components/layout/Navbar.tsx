@@ -97,6 +97,7 @@ export function Navbar({ user }: NavbarProps) {
           pathname={pathname}
           links={getDesktopNavLinks()}
           sheetsConnected={sheetsConnected}
+          onSwitchLayout={() => {}}
           onLogout={handleLogout}
         />
         <MobileHeader
