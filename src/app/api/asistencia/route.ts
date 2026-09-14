@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getAsistenciaHoy, registrarAsistencia } from "@/lib/google-sheets";
+import { getAsistenciaHoy, registrarAsistencia, getSalonConfig } from "@/lib/google-sheets";
 import { getTodayDateString, getCurrentTimeString } from "@/lib/utils";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const hoy = getTodayDateString();
+  const { searchParams } = new URL(req.url);
+  const fechaParam = searchParams.get("fecha");
+  const config = await getSalonConfig();
+  const tz = config.zona_horaria || "America/Mexico_City";
+
+  const hoy = fechaParam || getTodayDateString(tz);
   const registros = await getAsistenciaHoy(hoy);
   return NextResponse.json({ asistencia: registros, fecha: hoy });
 }
@@ -22,9 +29,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { tipoAccion } = body; // 'checkin' | 'checkout'
-    const hoy = getTodayDateString();
-    const horaActual = getCurrentTimeString();
+    const { tipoAccion, fecha, hora } = body; // 'checkin' | 'checkout'
+    const config = await getSalonConfig();
+    const tz = config.zona_horaria || "America/Mexico_City";
+
+    const hoy = fecha || getTodayDateString(tz);
+    const horaActual = hora || getCurrentTimeString(tz);
 
     const registros = await getAsistenciaHoy(hoy);
     const miRegistro = registros.find((r) => r.id_agente === user.userId);

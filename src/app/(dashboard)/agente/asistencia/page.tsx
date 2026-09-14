@@ -20,8 +20,10 @@ export default function AsistenciaPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string>("");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     setCurrentTime(getCurrentTimeString());
     const interval = setInterval(() => {
       setCurrentTime(getCurrentTimeString());
@@ -36,9 +38,10 @@ export default function AsistenciaPage() {
   const cargarDatos = async () => {
     try {
       setLoading(true);
+      const hoyLocal = getTodayDateString();
       const [resUser, resAsis] = await Promise.all([
         fetch("/api/auth/me"),
-        fetch("/api/asistencia"),
+        fetch(`/api/asistencia?fecha=${hoyLocal}`),
       ]);
       const dataUser = await resUser.json();
       const dataAsis = await resAsis.json();
@@ -57,10 +60,16 @@ export default function AsistenciaPage() {
     setError(null);
 
     try {
+      const hoyLocal = getTodayDateString();
+      const horaLocal = getCurrentTimeString();
       const res = await fetch("/api/asistencia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipoAccion }),
+        body: JSON.stringify({
+          tipoAccion,
+          fecha: hoyLocal,
+          hora: horaLocal,
+        }),
       });
 
       const data = await res.json();
@@ -93,14 +102,20 @@ export default function AsistenciaPage() {
             Registro de Jornada
           </h1>
           <p className="text-sm text-earth-600 dark:text-earth-400 mt-1">
-            Fecha de hoy: <strong>{getTodayDateString()}</strong>
+            Fecha de hoy:{" "}
+            <strong suppressHydrationWarning>
+              {mounted ? getTodayDateString() : "--"}
+            </strong>
           </p>
         </div>
 
         <div className="text-right">
           <span className="text-xs text-earth-500 block">Hora Local</span>
-          <span className="text-3xl font-mono font-bold text-earth-900 dark:text-cream-100 tracking-wider">
-            {currentTime || "--:--"}
+          <span
+            suppressHydrationWarning
+            className="text-3xl font-mono font-bold text-earth-900 dark:text-cream-100 tracking-wider"
+          >
+            {mounted && currentTime ? currentTime : "--:--"}
           </span>
         </div>
       </div>
@@ -161,7 +176,7 @@ export default function AsistenciaPage() {
                   <strong>{miRegistro.hora_checkout} hrs</strong>
                 </p>
                 <p className="text-[11px] text-earth-500">
-                  Tus horas registradas migrarán a la hoja Asistencia en el cierre automático de día.
+                  Tu jornada ha sido registrada y guardada en tiempo real en la hoja Asistencia.
                 </p>
               </div>
             )}

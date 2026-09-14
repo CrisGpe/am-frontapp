@@ -26,7 +26,7 @@ export default function ClienteCitasPage() {
   // Estado del flujo de reserva
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
   const [agenteSeleccionado, setAgenteSeleccionado] = useState<Agente | null>(null);
-  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(getTodayDateString());
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>("");
   const [slotsDisponibles, setSlotsDisponibles] = useState<TimeSlot[]>([]);
   const [horaSeleccionada, setHoraSeleccionada] = useState<string>("");
   const [notas, setNotas] = useState<string>("");
@@ -37,6 +37,7 @@ export default function ClienteCitasPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    setFechaSeleccionada(getTodayDateString());
     cargarDatos();
   }, []);
 
@@ -310,7 +311,8 @@ export default function ClienteCitasPage() {
                 </label>
                 <input
                   type="date"
-                  min={getTodayDateString()}
+                  suppressHydrationWarning
+                  min={fechaSeleccionada || undefined}
                   value={fechaSeleccionada}
                   onChange={(e) => setFechaSeleccionada(e.target.value)}
                   className="w-full max-w-xs p-2.5 text-xs rounded-xl border border-earth-200 dark:border-earth-800 bg-white dark:bg-earth-950 text-earth-900 dark:text-cream-100"
