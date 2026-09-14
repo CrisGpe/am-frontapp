@@ -20,17 +20,19 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || user.tipo !== "agente") {
+  if (!user || (user.tipo !== "agente" && user.rol !== "admin")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   try {
-    const { disponible } = await req.json();
-    const actualizado = await updateAgenteDisponibilidad(user.userId, Boolean(disponible));
+    const { id_agente, disponible } = await req.json();
+    const targetId = user.rol === "admin" && id_agente ? id_agente : user.userId;
+    const actualizado = await updateAgenteDisponibilidad(targetId, Boolean(disponible));
 
     return NextResponse.json({
       success: true,
       disponible_turnos: actualizado?.disponible_turnos,
+      agente: actualizado,
     });
   } catch (error: any) {
     return NextResponse.json(
