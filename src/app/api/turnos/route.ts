@@ -12,7 +12,7 @@ import {
 } from "@/lib/google-sheets";
 import { evaluarAgentesParaTurno } from "@/lib/turnos-algorithm";
 import { getCurrentTimeString, getTodayDateString } from "@/lib/utils";
-import { TurnoEspera } from "@/lib/types";
+import { TurnoEspera, ColaAgenteItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,59 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ turnos: turnosConSugerencia });
+  // Evaluación de la Cola General de Colaboradores (Rotación actual)
+  const servicioGenerico = {
+    id: "SV-GEN",
+    nombre: "General",
+    categoria: "otro" as const,
+    especialidad_requerida: "",
+    duracion_min: 45,
+    precio_base: 0,
+    activo: true,
+  };
+
+  const evaluacionesGenerales = evaluarAgentesParaTurno(
+    servicioGenerico,
+    agentes,
+    borrador,
+    asistencias,
+    citas
+  );
+
+  const colaAgentes: ColaAgenteItem[] = evaluacionesGenerales.map((e) => {
+    const atencionesActivas = borrador.filter(
+      (b) =>
+        b.id_agente === e.agente.id &&
+        (b.etapa === "atencion" || b.etapa === "asesoria" || b.etapa === "fin_atencion")
+    );
+    const ordenActiva = atencionesActivas.length > 0 ? atencionesActivas[0] : null;
+
+    return {
+      id: e.agente.id,
+      nombre: e.agente.nombre,
+      especialidades: e.agente.especialidades || [],
+      disponible_turnos: e.agente.disponible_turnos,
+      elegible: e.elegible,
+      motivoNoElegible: e.motivoNoElegible,
+      enAtencionActiva: e.enAtencionActiva,
+      ordenActiva: ordenActiva
+        ? {
+            id_oatc: ordenActiva.id_oatc,
+            nombre_servicio: ordenActiva.nombre_servicio,
+            etapa: ordenActiva.etapa,
+            hora_inicio: ordenActiva.hora_inicio,
+          }
+        : null,
+      totalAtencionesHoy: e.totalAtencionesHoy,
+      ultimaHoraFin: e.ultimaHoraFin,
+      prioridadScore: e.prioridadScore,
+    };
+  });
+
+  return NextResponse.json({
+    turnos: turnosConSugerencia,
+    colaAgentes,
+  });
 }
 
 export async function POST(req: NextRequest) {

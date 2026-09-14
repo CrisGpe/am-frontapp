@@ -175,3 +175,23 @@ export interface TurnoConSugerencia extends TurnoEspera {
     especialidadesMatch: boolean;
   };
 }
+
+export interface ColaAgenteItem {
+  id: string;
+  nombre: string;
+  especialidades: string[];
+  disponible_turnos: boolean;
+  elegible: boolean;
+  motivoNoElegible?: string;
+  enAtencionActiva: boolean;
+  ordenActiva?: {
+    id_oatc: string;
+    nombre_servicio: string;
+    etapa: string;
+    hora_inicio: string;
+  } | null;
+  totalAtencionesHoy: number;
+  ultimaHoraFin?: string;
+  prioridadScore: number;
+}
+
