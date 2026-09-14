@@ -48,3 +48,41 @@ export function getCurrentTimeString(timeZone: string = "America/Lima"): string 
     return `${hours}:${minutes}`;
   }
 }
+
+/**
+ * Coordenadas oficiales de Salón Élite & Spa:
+ * Av. Horacio Urteaga, Jesús María, Lima, Perú.
+ */
+export const SALON_COORDS = {
+  lat: -12.0725,
+  lng: -77.0485,
+  direccion: "Av. Horacio Urteaga, Jesús María, Lima",
+};
+
+/**
+ * Radio de tolerancia en metros para validar presencia física dentro del local
+ */
+export const SALON_RADIO_METROS = 70;
+
+/**
+ * Calcula la distancia ortodrómica en metros entre dos puntos geográficos (Fórmula de Haversine)
+ */
+export function calcularDistanciaMetros(
+  lat1: number,
+  lon1: number,
+  lat2: number = SALON_COORDS.lat,
+  lon2: number = SALON_COORDS.lng
+): number {
+  const R = 6371e3; // Radio terrestre en metros
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Math.round(R * c);
+}

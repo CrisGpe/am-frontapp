@@ -231,14 +231,14 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
               Precio del Servicio (Ajustable)
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-earth-400 font-bold">$</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-earth-400 font-bold">S/</span>
               <input
                 type="number"
                 min="0"
-                step="10"
+                step="5"
                 value={precioServicio}
                 onChange={(e) => setPrecioServicio(Number(e.target.value) || 0)}
-                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-earth-200 dark:border-earth-800 bg-white dark:bg-earth-950 font-bold text-earth-900 dark:text-cream-100 focus:outline-none focus:ring-2 focus:ring-earth-500"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-earth-200 dark:border-earth-800 bg-white dark:bg-earth-950 font-bold text-earth-900 dark:text-cream-100 focus:outline-none focus:ring-2 focus:ring-earth-500"
               />
             </div>
             <p className="text-[11px] text-earth-500 mt-1">

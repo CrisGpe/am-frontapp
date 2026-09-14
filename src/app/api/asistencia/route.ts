@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getAsistenciaHoy, registrarAsistencia, getSalonConfig } from "@/lib/google-sheets";
-import { getTodayDateString, getCurrentTimeString } from "@/lib/utils";
+import {
+  getTodayDateString,
+  getCurrentTimeString,
+  calcularDistanciaMetros,
+  SALON_RADIO_METROS,
+} from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +19,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fechaParam = searchParams.get("fecha");
   const config = await getSalonConfig();
-  const tz = config.zona_horaria || "America/Mexico_City";
+  const tz = config.zona_horaria || "America/Lima";
 
   const hoy = fechaParam || getTodayDateString(tz);
   const registros = await getAsistenciaHoy(hoy);
@@ -29,12 +34,28 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { tipoAccion, fecha, hora } = body; // 'checkin' | 'checkout'
+    const { tipoAccion, fecha, hora, ubicacion } = body; // 'checkin' | 'checkout'
     const config = await getSalonConfig();
-    const tz = config.zona_horaria || "America/Mexico_City";
+    const tz = config.zona_horaria || "America/Lima";
 
     const hoy = fecha || getTodayDateString(tz);
     const horaActual = hora || getCurrentTimeString(tz);
+
+    // Validación de Geocercado GPS
+    let distancia_metros: number | undefined;
+    let alerta_ubicacion = false;
+    let latitud: number | undefined;
+    let longitud: number | undefined;
+
+    if (ubicacion?.latitud != null && ubicacion?.longitud != null) {
+      latitud = Number(ubicacion.latitud);
+      longitud = Number(ubicacion.longitud);
+      distancia_metros = calcularDistanciaMetros(latitud, longitud);
+      alerta_ubicacion = distancia_metros > SALON_RADIO_METROS;
+    } else {
+      // Si el agente no envió coordenadas GPS (bloqueó permisos), se genera alerta de auditoría
+      alerta_ubicacion = true;
+    }
 
     const registros = await getAsistenciaHoy(hoy);
     const miRegistro = registros.find((r) => r.id_agente === user.userId);
@@ -53,9 +74,18 @@ export async function POST(req: NextRequest) {
         nombre_agente: user.nombre,
         hora_checkin: horaActual,
         estado: "presente",
+        latitud,
+        longitud,
+        distancia_metros,
+        alerta_ubicacion,
       });
 
-      return NextResponse.json({ success: true, asistencia: nuevoRegistro });
+      return NextResponse.json({
+        success: true,
+        asistencia: nuevoRegistro,
+        alerta_ubicacion,
+        distancia_metros,
+      });
     } else if (tipoAccion === "checkout") {
       if (!miRegistro) {
         return NextResponse.json(
@@ -67,13 +97,22 @@ export async function POST(req: NextRequest) {
       const actualizado = await registrarAsistencia({
         ...miRegistro,
         hora_checkout: horaActual,
+        latitud: latitud ?? miRegistro.latitud,
+        longitud: longitud ?? miRegistro.longitud,
+        distancia_metros: distancia_metros ?? miRegistro.distancia_metros,
+        alerta_ubicacion: alerta_ubicacion || miRegistro.alerta_ubicacion,
       });
 
-      return NextResponse.json({ success: true, asistencia: actualizado });
+      return NextResponse.json({
+        success: true,
+        asistencia: actualizado,
+        alerta_ubicacion,
+        distancia_metros,
+      });
     }
 
     return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
       { error: "Error al registrar asistencia" },
       { status: 500 }

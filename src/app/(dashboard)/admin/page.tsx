@@ -24,8 +24,10 @@ import {
   X,
   FileSpreadsheet,
   Archive,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
+import { CobranzaModal } from "@/components/oatc/CobranzaModal";
 
 export default function AdminDashboardPage() {
   const [user, setUser] = useState<UserSession | null>(null);
@@ -37,6 +39,9 @@ export default function AdminDashboardPage() {
 
   // Tab de visualización de tablas: Borrador vs Histórico OATC
   const [tablaActiva, setTablaActiva] = useState<"borrador" | "oatc">("borrador");
+
+  // Estado Modal de Cobranza (Caja)
+  const [cobranzaOatc, setCobranzaOatc] = useState<BorradorEntry | null>(null);
 
   // Estados Cierre de Día
   const [confirmCierreOpen, setConfirmCierreOpen] = useState(false);
@@ -337,6 +342,7 @@ export default function AdminDashboardPage() {
                           <th className="p-3">Etapa</th>
                           <th className="p-3">Comprobante</th>
                           <th className="p-3 text-right">Precio Final</th>
+                          <th className="p-3 text-center">Acción / Cobro</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-earth-100 dark:divide-earth-800/60">
@@ -364,6 +370,32 @@ export default function AdminDashboardPage() {
                             </td>
                             <td className="p-3 text-right font-bold text-earth-900 dark:text-cream-100">
                               {formatCurrency(row.precio_final)}
+                            </td>
+                            <td className="p-3 text-center">
+                              {row.etapa === "fin_atencion" ? (
+                                <button
+                                  onClick={() => setCobranzaOatc(row)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm shadow-emerald-600/30 transition-all active:scale-95 animate-pulse"
+                                  title="El estilista finalizó la atención. Proceder al cobro en caja con número de comprobante."
+                                >
+                                  <Receipt className="w-3.5 h-3.5" />
+                                  <span>Cobrar en Caja</span>
+                                </button>
+                              ) : row.etapa === "completada" ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Cobrada ({row.comprobante_externo || "OK"})</span>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => setCobranzaOatc(row)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-earth-100 dark:bg-earth-800 hover:bg-earth-200 dark:hover:bg-earth-700 text-earth-700 dark:text-cream-200 text-xs font-semibold transition-colors"
+                                  title="Cobro directo o anticipado en caja"
+                                >
+                                  <Receipt className="w-3.5 h-3.5" />
+                                  <span>Cobro Caja</span>
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -515,6 +547,17 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Cobranza en Caja */}
+      <CobranzaModal
+        isOpen={!!cobranzaOatc}
+        onClose={() => setCobranzaOatc(null)}
+        oatc={cobranzaOatc}
+        onSuccess={async () => {
+          setCobranzaOatc(null);
+          await cargarDatos();
+        }}
+      />
     </div>
   );
 }

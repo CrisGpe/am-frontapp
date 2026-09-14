@@ -18,6 +18,8 @@ import {
   PauseCircle,
   PlayCircle,
   RefreshCw,
+  AlertTriangle,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -367,10 +369,26 @@ export default function AdminAgentesPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-earth-500 text-[11px]">Asistencia:</span>
                     {estaPresente ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Presente ({regAsistencia?.hora_checkin})
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Presente ({regAsistencia?.hora_checkin})
+                        </span>
+                        {regAsistencia?.alerta_ubicacion ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
+                            title={`Check-in realizado fuera de rango permitido (~${regAsistencia.distancia_metros}m del salón)`}
+                          >
+                            <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                            ⚠️ Fuera de rango ({regAsistencia.distancia_metros}m)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                            <MapPin className="w-3 h-3" />
+                            En Salón
+                          </span>
+                        )}
+                      </div>
                     ) : yaSalio ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300">
                         <Clock className="w-3 h-3" />

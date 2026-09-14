@@ -320,25 +320,11 @@ export default function AgenteDashboardPage() {
                     </button>
                   )}
 
-                  {oatc.etapa === "fin_atencion" && (
-                    <button
-                      onClick={() => handleCambiarEtapa(oatc.id_oatc, "cobranza")}
-                      disabled={updatingOatc === oatc.id_oatc}
-                      className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
-                    >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      {updatingOatc === oatc.id_oatc ? "Actualizando..." : "Pasar a Cobranza / Caja"}
-                    </button>
-                  )}
-
-                  {oatc.etapa === "cobranza" && (
-                    <button
-                      onClick={() => setCobranzaOatc(oatc)}
-                      className="w-full py-2.5 rounded-xl bg-sage-600 hover:bg-sage-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-sage-600/20 transition-all animate-pulse"
-                    >
-                      <Receipt className="w-3.5 h-3.5" />
-                      Ingresar Comprobante & Cerrar Cobro
-                    </button>
+                  {(oatc.etapa === "fin_atencion" || oatc.etapa === "cobranza") && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 text-center">
+                      <Clock className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+                      <span>Servicio Finalizado — En espera de cobro en Caja</span>
+                    </div>
                   )}
 
                   {oatc.etapa === "completada" && (

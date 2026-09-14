@@ -106,6 +106,10 @@ export interface AsistenciaRecord {
   hora_checkin: string;
   hora_checkout?: string;
   estado: EstadoAsistencia;
+  latitud?: number;
+  longitud?: number;
+  distancia_metros?: number;
+  alerta_ubicacion?: boolean;
 }
 
 export interface CitaRecord {

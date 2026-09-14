@@ -9,7 +9,7 @@ export async function getAsistenciaHoy(fecha: string): Promise<AsistenciaRecord[
   try {
     const res = await client.sheets.spreadsheets.values.get({
       spreadsheetId: client.sheetId,
-      range: "Asistencia!A2:F",
+      range: "Asistencia!A2:J",
     });
     const rows = res.data.values || [];
     if (rows.length === 0) return [];
@@ -23,6 +23,10 @@ export async function getAsistenciaHoy(fecha: string): Promise<AsistenciaRecord[
         hora_checkin: r[3] || undefined,
         hora_checkout: r[4] || undefined,
         estado: (r[5] as AsistenciaRecord["estado"]) || "presente",
+        latitud: r[6] ? Number(r[6]) : undefined,
+        longitud: r[7] ? Number(r[7]) : undefined,
+        distancia_metros: r[8] ? Number(r[8]) : undefined,
+        alerta_ubicacion: r[9] === "TRUE" || r[9] === "true",
       }));
   } catch (err) {
     console.warn("Fallback a memoria para Asistencia:", err);
@@ -61,20 +65,24 @@ export async function registrarAsistencia(record: AsistenciaRecord): Promise<Asi
         record.hora_checkin || "",
         record.hora_checkout || "",
         record.estado,
+        record.latitud != null ? String(record.latitud) : "",
+        record.longitud != null ? String(record.longitud) : "",
+        record.distancia_metros != null ? String(record.distancia_metros) : "",
+        record.alerta_ubicacion ? "TRUE" : "FALSE",
       ];
 
       if (rowIndex !== -1) {
         const rowNum = rowIndex + 2;
         await client.sheets.spreadsheets.values.update({
           spreadsheetId: client.sheetId,
-          range: `Asistencia!A${rowNum}:F${rowNum}`,
+          range: `Asistencia!A${rowNum}:J${rowNum}`,
           valueInputOption: "USER_ENTERED",
           requestBody: { values: [rowValues] },
         });
       } else {
         await client.sheets.spreadsheets.values.append({
           spreadsheetId: client.sheetId,
-          range: "Asistencia!A2:F",
+          range: "Asistencia!A2:J",
           valueInputOption: "USER_ENTERED",
           requestBody: { values: [rowValues] },
         });
