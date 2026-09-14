@@ -18,10 +18,14 @@ export default function PWAInstaller() {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('SW registered:', registration);
+          if (process.env.NODE_ENV === "development") {
+            console.log("SW registered:", registration);
+          }
         })
         .catch((error) => {
-          console.error('SW registration failed:', error);
+          if (process.env.NODE_ENV === "development") {
+            console.error("SW registration failed:", error);
+          }
         });
     }
 
