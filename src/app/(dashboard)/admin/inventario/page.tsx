@@ -1,28 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Producto, Insumo } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
-import {
-  Package,
-  Droplet,
-  AlertTriangle,
-  Search,
-  Plus,
-  Minus,
-  RefreshCw,
-  CheckCircle2,
-  Boxes,
-  Sparkles,
-} from "lucide-react";
-
-interface ProductoConAlerta extends Producto {
-  alertaStockBajo: boolean;
-}
-
-interface InsumoConAlerta extends Insumo {
-  alertaStockBajo: boolean;
-}
+import { Boxes, Package, Droplet, Search, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { StockAlertBanner } from "@/components/inventario/StockAlertBanner";
+import { ProductosTable, ProductoConAlerta } from "@/components/inventario/ProductosTable";
+import { InsumosTable, InsumoConAlerta } from "@/components/inventario/InsumosTable";
 
 export default function AdminInventarioPage() {
   const [tab, setTab] = useState<"productos" | "insumos">("productos");
@@ -82,7 +64,7 @@ export default function AdminInventarioPage() {
       } else {
         setMensaje({ tipo: "error", texto: data.error || "Error al actualizar stock" });
       }
-    } catch (err) {
+    } catch {
       setMensaje({ tipo: "error", texto: "Error de red al actualizar stock" });
     } finally {
       setActualizandoId(null);
@@ -129,45 +111,11 @@ export default function AdminInventarioPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-earth-100 dark:bg-earth-800 flex items-center justify-center text-earth-600 dark:text-earth-300">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs text-earth-500 font-medium block">Productos en Catálogo</span>
-            <span className="text-2xl font-bold text-earth-900 dark:text-cream-100">{productos.length}</span>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-earth-100 dark:bg-earth-800 flex items-center justify-center text-earth-600 dark:text-earth-300">
-            <Droplet className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs text-earth-500 font-medium block">Insumos de Trabajo</span>
-            <span className="text-2xl font-bold text-earth-900 dark:text-cream-100">{insumos.length}</span>
-          </div>
-        </div>
-
-        <div className={`border rounded-2xl p-5 shadow-sm flex items-center gap-4 ${
-          totalAlertas > 0
-            ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800"
-            : "bg-white dark:bg-earth-900 border-earth-200 dark:border-earth-800"
-        }`}>
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-            totalAlertas > 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300" : "bg-earth-100 text-earth-600"
-          }`}>
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-xs text-earth-500 font-medium block">Stock Bajo (≤ 3 unidades)</span>
-            <span className={`text-2xl font-bold ${totalAlertas > 0 ? "text-amber-700 dark:text-amber-300" : "text-earth-900 dark:text-cream-100"}`}>
-              {totalAlertas}
-            </span>
-          </div>
-        </div>
-      </div>
+      <StockAlertBanner
+        totalProductos={productos.length}
+        totalInsumos={insumos.length}
+        totalAlertas={totalAlertas}
+      />
 
       {/* Feedback Alert */}
       {mensaje && (
@@ -179,7 +127,11 @@ export default function AdminInventarioPage() {
               : "bg-red-50 text-red-800 border border-red-200"
           }`}
         >
-          {mensaje.tipo === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+          {mensaje.tipo === "success" ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+          )}
           <span>{mensaje.texto}</span>
         </div>
       )}
@@ -228,156 +180,17 @@ export default function AdminInventarioPage() {
         {loading ? (
           <div className="p-12 text-center text-xs text-earth-500">Cargando inventario...</div>
         ) : tab === "productos" ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-earth-50 dark:bg-earth-950/60 border-b border-earth-200 dark:border-earth-800 text-earth-600 dark:text-earth-400 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Producto</th>
-                  <th className="p-4">Marca / Categoría</th>
-                  <th className="p-4">Precio Venta</th>
-                  <th className="p-4">Stock Actual</th>
-                  <th className="p-4 text-right">Ajuste de Stock</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-earth-100 dark:divide-earth-800 text-earth-800 dark:text-cream-200">
-                {productosFiltrados.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-earth-500">
-                      No se encontraron productos.
-                    </td>
-                  </tr>
-                ) : (
-                  productosFiltrados.map((p) => (
-                    <tr key={p.id} className="hover:bg-earth-50/50 dark:hover:bg-earth-800/40 transition-colors">
-                      <td className="p-4 font-mono font-bold text-earth-500">{p.id}</td>
-                      <td className="p-4">
-                        <div className="font-bold text-earth-900 dark:text-cream-100">{p.nombre}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="text-earth-600 dark:text-earth-400">{p.marca}</span>
-                        <span className="text-[10px] ml-2 px-2 py-0.5 rounded-full bg-earth-100 dark:bg-earth-800 text-earth-600">
-                          {p.categoria}
-                        </span>
-                      </td>
-                      <td className="p-4 font-semibold text-earth-900 dark:text-cream-100">
-                        {formatCurrency(p.precio_venta)}
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-xs ${
-                            p.alertaStockBajo
-                              ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-200"
-                              : "bg-sage-100 text-sage-800 border border-sage-200 dark:bg-sage-950 dark:text-sage-200"
-                          }`}
-                        >
-                          {p.stock} unid.
-                          {p.alertaStockBajo && <AlertTriangle className="w-3 h-3 text-amber-600" />}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={p.stock <= 0 || actualizandoId === p.id}
-                            onClick={() => handleModificarStock("producto", p.id, p.stock - 1)}
-                            className="p-1.5 rounded-lg border border-earth-200 hover:bg-earth-100 dark:hover:bg-earth-800 text-earth-700 disabled:opacity-40 transition-colors"
-                            title="Disminuir 1"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={actualizandoId === p.id}
-                            onClick={() => handleModificarStock("producto", p.id, p.stock + 1)}
-                            className="p-1.5 rounded-lg border border-earth-200 hover:bg-earth-100 dark:hover:bg-earth-800 text-earth-700 disabled:opacity-40 transition-colors"
-                            title="Aumentar 1"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ProductosTable
+            productos={productosFiltrados}
+            actualizandoId={actualizandoId}
+            onModificarStock={(id, nuevoStock) => handleModificarStock("producto", id, nuevoStock)}
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-earth-50 dark:bg-earth-950/60 border-b border-earth-200 dark:border-earth-800 text-earth-600 dark:text-earth-400 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Insumo</th>
-                  <th className="p-4">Categoría</th>
-                  <th className="p-4">Unidad de Medida</th>
-                  <th className="p-4">Costo Unit.</th>
-                  <th className="p-4">Stock Actual</th>
-                  <th className="p-4 text-right">Ajuste de Stock</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-earth-100 dark:divide-earth-800 text-earth-800 dark:text-cream-200">
-                {insumosFiltrados.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-earth-500">
-                      No se encontraron insumos.
-                    </td>
-                  </tr>
-                ) : (
-                  insumosFiltrados.map((i) => (
-                    <tr key={i.id} className="hover:bg-earth-50/50 dark:hover:bg-earth-800/40 transition-colors">
-                      <td className="p-4 font-mono font-bold text-earth-500">{i.id}</td>
-                      <td className="p-4">
-                        <div className="font-bold text-earth-900 dark:text-cream-100">{i.nombre}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2 py-0.5 rounded-full bg-earth-100 dark:bg-earth-800 text-earth-600 text-[10px]">
-                          {i.categoria}
-                        </span>
-                      </td>
-                      <td className="p-4 text-earth-600">{i.unidad_medida}</td>
-                      <td className="p-4 font-medium text-earth-600">{formatCurrency(i.costo_unitario)}</td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-xs ${
-                            i.alertaStockBajo
-                              ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-200"
-                              : "bg-sage-100 text-sage-800 border border-sage-200 dark:bg-sage-950 dark:text-sage-200"
-                          }`}
-                        >
-                          {i.stock} {i.unidad_medida}
-                          {i.alertaStockBajo && <AlertTriangle className="w-3 h-3 text-amber-600" />}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={i.stock <= 0 || actualizandoId === i.id}
-                            onClick={() => handleModificarStock("insumo", i.id, i.stock - 1)}
-                            className="p-1.5 rounded-lg border border-earth-200 hover:bg-earth-100 dark:hover:bg-earth-800 text-earth-700 disabled:opacity-40 transition-colors"
-                            title="Disminuir 1"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={actualizandoId === i.id}
-                            onClick={() => handleModificarStock("insumo", i.id, i.stock + 1)}
-                            className="p-1.5 rounded-lg border border-earth-200 hover:bg-earth-100 dark:hover:bg-earth-800 text-earth-700 disabled:opacity-40 transition-colors"
-                            title="Aumentar 1"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <InsumosTable
+            insumos={insumosFiltrados}
+            actualizandoId={actualizandoId}
+            onModificarStock={(id, nuevoStock) => handleModificarStock("insumo", id, nuevoStock)}
+          />
         )}
       </div>
     </div>

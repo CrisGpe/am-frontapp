@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { formatCurrency } from "@/lib/utils";
 import { UserSession } from "@/lib/types";
+import { KpiSummaryCards } from "@/components/reportes/KpiSummaryCards";
+import { VentasTrendChart } from "@/components/reportes/VentasTrendChart";
+import { ColaboradoresTable } from "@/components/reportes/ColaboradoresTable";
+import { TopServiciosList } from "@/components/reportes/TopServiciosList";
 
 type ReporteData = {
   kpis: {
@@ -46,8 +49,8 @@ export default function AdminReportesPage() {
       setLoading(true);
       try {
         const [resUser, resRep] = await Promise.all([
-          fetch('/api/auth/me'),
-          fetch(`/api/reportes?periodo=${periodo}`)
+          fetch("/api/auth/me"),
+          fetch(`/api/reportes?periodo=${periodo}`),
         ]);
         if (resUser.ok) {
           const uData = await resUser.json();
@@ -66,9 +69,9 @@ export default function AdminReportesPage() {
     fetchData();
   }, [periodo]);
 
-  if (user?.rol !== "admin") {
+  if (user && user.rol !== "admin") {
     return (
-      <div className="p-4 text-center text-red-500">
+      <div className="p-8 text-center text-rose-500 font-medium">
         No autorizado. Solo administradores pueden ver esta página.
       </div>
     );
@@ -118,42 +121,52 @@ export default function AdminReportesPage() {
     document.body.removeChild(link);
   };
 
-  const maxTotalVentaPorDia = data
-    ? Math.max(...data.ventasPorDia.map((d) => d.total), 1)
-    : 1;
+  const totalComisiones = data
+    ? data.desglosePorColaborador.reduce(
+        (acc, curr) => acc + curr.comisionEstimada,
+        0
+      )
+    : 0;
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Reportes Financieros</h1>
-          <p className="text-slate-500">
-            Resumen general del rendimiento del salón.
+          <h1 className="text-2xl font-bold text-earth-900 dark:text-cream-100">
+            Reportes Financieros y Métricas
+          </h1>
+          <p className="text-sm text-earth-500">
+            Resumen general del rendimiento comercial y operativo del salón.
           </p>
         </div>
         <button
           onClick={exportCSV}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded shadow-sm text-sm"
+          disabled={!data || loading}
+          className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl shadow-sm text-xs font-semibold tracking-wide transition-all"
         >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
           Exportar CSV
         </button>
       </div>
 
-      {/* Filtro Periodo */}
-      <div className="flex gap-2 mb-4 overflow-x-auto">
+      {/* Selector de Periodo */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
         {[
-          { id: "todo", label: "Todo" },
+          { id: "todo", label: "Todo el Historial" },
           { id: "este_mes", label: "Este Mes" },
-          { id: "ultimos_7", label: "Últimos 7 días" },
+          { id: "ultimos_7", label: "Últimos 7 Días" },
           { id: "hoy", label: "Hoy" },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setPeriodo(tab.id)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               periodo === tab.id
-                ? "bg-indigo-600 text-white shadow"
-                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                ? "bg-earth-800 text-cream-100 shadow-sm"
+                : "bg-white dark:bg-earth-900 text-earth-600 dark:text-cream-300 hover:bg-earth-100 dark:hover:bg-earth-800 border border-earth-200 dark:border-earth-800"
             }`}
           >
             {tab.label}
@@ -162,152 +175,26 @@ export default function AdminReportesPage() {
       </div>
 
       {loading || !data ? (
-        <div className="text-center py-10 text-slate-500">Cargando reporte...</div>
+        <div className="py-20 text-center text-sm text-earth-400 animate-pulse">
+          Calculando métricas del periodo...
+        </div>
       ) : (
         <div className="space-y-6">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <p className="text-sm text-slate-500 font-medium">Ingresos (Periodo)</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {formatCurrency(data.kpis.totalIngresosPeriodo)}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <p className="text-sm text-slate-500 font-medium">Ticket Promedio</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {formatCurrency(data.kpis.ticketPromedio)}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <p className="text-sm text-slate-500 font-medium">Atenciones Completadas</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {data.kpis.totalAtenciones}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <p className="text-sm text-slate-500 font-medium">Comisiones (Est. 40%)</p>
-              <p className="text-2xl font-bold text-slate-800">
-                {formatCurrency(
-                  data.desglosePorColaborador.reduce(
-                    (acc, curr) => acc + curr.comisionEstimada,
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
+          {/* KPI Summary Cards */}
+          <KpiSummaryCards
+            totalIngresosPeriodo={data.kpis.totalIngresosPeriodo}
+            ticketPromedio={data.kpis.ticketPromedio}
+            totalAtenciones={data.kpis.totalAtenciones}
+            totalComisiones={totalComisiones}
+          />
 
-          {/* Grafico CSS */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-700 mb-4">
-              Tendencia de Ventas (Últimos 14 días)
-            </h2>
-            <div className="h-64 w-full flex items-end justify-between gap-1 mt-4">
-              {data.ventasPorDia.map((d, idx) => {
-                const heightPorcentaje = Math.max(
-                  (d.total / maxTotalVentaPorDia) * 100,
-                  2
-                ); // Min 2% para que se vea
-                const dateParts = d.fecha.split("-");
-                const label = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}` : d.fecha;
-                return (
-                  <div key={idx} className="flex-1 flex flex-col justify-end items-center group relative h-full">
-                    {/* Tooltip */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 bg-slate-800 text-white text-xs p-2 rounded pointer-events-none whitespace-nowrap z-10">
-                      {d.fecha}: {formatCurrency(d.total)} ({d.atenciones} aten.)
-                    </div>
-                    {/* Barra */}
-                    <div
-                      className="w-full bg-indigo-500 rounded-t hover:bg-indigo-600 transition-colors"
-                      style={{ height: `${heightPorcentaje}%` }}
-                    ></div>
-                    {/* Etiqueta Eje X */}
-                    <div className="text-[10px] text-slate-500 mt-2 truncate w-full text-center">
-                      {label}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          {/* Tendencia Diaria Chart */}
+          <VentasTrendChart ventasPorDia={data.ventasPorDia} />
 
+          {/* Grid: Colaboradores & Top Servicios */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Rendimiento Colaboradores */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-700 mb-4">
-                Rendimiento de Colaboradores
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="bg-slate-50 border-b">
-                    <tr>
-                      <th className="p-3 font-medium">Nombre</th>
-                      <th className="p-3 font-medium text-center">Atenciones</th>
-                      <th className="p-3 font-medium text-right">Ventas</th>
-                      <th className="p-3 font-medium text-right">Comisión (40%)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.desglosePorColaborador.map((col) => (
-                      <tr key={col.id} className="border-b last:border-0 hover:bg-slate-50">
-                        <td className="p-3">{col.nombre}</td>
-                        <td className="p-3 text-center">{col.atenciones}</td>
-                        <td className="p-3 text-right font-semibold text-slate-700">
-                          {formatCurrency(col.totalVentas)}
-                        </td>
-                        <td className="p-3 text-right text-emerald-600 font-medium">
-                          {formatCurrency(col.comisionEstimada)}
-                        </td>
-                      </tr>
-                    ))}
-                    {data.desglosePorColaborador.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="p-3 text-center text-slate-500">
-                          No hay datos en el periodo.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Servicios Más Vendidos */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="text-lg font-semibold text-slate-700 mb-4">
-                Servicios Más Vendidos
-              </h2>
-              <div className="space-y-4">
-                {data.serviciosMasVendidos.slice(0, 5).map((serv) => {
-                  const maxVenta = data.serviciosMasVendidos[0]?.total || 1;
-                  const porcentaje = Math.min(100, Math.round((serv.total / maxVenta) * 100));
-                  return (
-                    <div key={serv.id}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-slate-700">
-                          {serv.nombre} <span className="text-slate-500 font-normal">({serv.cantidad} atenciones)</span>
-                        </span>
-                        <span className="text-slate-700 font-semibold">
-                          {formatCurrency(serv.total)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2">
-                        <div
-                          className="bg-indigo-500 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${porcentaje}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {data.serviciosMasVendidos.length === 0 && (
-                  <div className="text-center text-slate-500 py-4">
-                    No hay datos en el periodo.
-                  </div>
-                )}
-              </div>
-            </div>
+            <ColaboradoresTable colaboradores={data.desglosePorColaborador} />
+            <TopServiciosList servicios={data.serviciosMasVendidos} />
           </div>
         </div>
       )}
