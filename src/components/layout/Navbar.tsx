@@ -26,6 +26,16 @@ export function Navbar({ user }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sheetsConnected, setSheetsConnected] = useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/health/sheets")
+      .then((res) => res.json())
+      .then((data) => {
+        setSheetsConnected(data.connected === true);
+      })
+      .catch(() => setSheetsConnected(false));
+  }, []);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -102,6 +112,25 @@ export function Navbar({ user }: NavbarProps) {
 
           {/* User profile & actions */}
           <div className="hidden md:flex items-center gap-3">
+            {sheetsConnected === true && (
+              <span
+                title="Sincronizado con Google Sheets en tiempo real"
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-sage-50 text-sage-700 border border-sage-200 dark:bg-sage-950 dark:text-sage-300 dark:border-sage-800"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-sage-500" />
+                Sheets Conectado
+              </span>
+            )}
+            {sheetsConnected === false && (
+              <span
+                title="Modo Fallback en Memoria. Configura las variables en Vercel Settings -> Environment Variables para escribir en Google Sheets."
+                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Sheets en Memoria (Configura Vercel)
+              </span>
+            )}
+
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-earth-50 dark:bg-earth-900 border border-earth-200 dark:border-earth-800 text-xs">
               <span className="w-2 h-2 rounded-full bg-sage-500 animate-pulse" />
               <span className="font-medium text-earth-800 dark:text-cream-100">
