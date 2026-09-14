@@ -10,11 +10,14 @@ import {
 } from "@/lib/google-sheets";
 import { CitaRecord } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+
 
   const [todasCitas, servicios, agentes, clientes] = await Promise.all([
     getCitas(user.tipo === "cliente" ? user.userId : undefined),
@@ -93,6 +96,21 @@ export async function PATCH(req: NextRequest) {
         { error: "id_cita y estado son requeridos" },
         { status: 400 }
       );
+    }
+    
+    if (!["pendiente", "confirmada", "cancelada", "completada"].includes(estado)) {
+      return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
+    }
+
+    const citas = await getCitas();
+    const cita = citas.find(c => c.id === id_cita);
+    
+    if (!cita) {
+      return NextResponse.json({ error: "Cita no encontrada" }, { status: 404 });
+    }
+    
+    if (user.tipo === "cliente" && cita.id_cliente !== user.userId) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
     const actualizada = await updateCita(id_cita, { estado });

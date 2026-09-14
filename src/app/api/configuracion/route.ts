@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getSalonConfig, updateSalonConfig } from "@/lib/google-sheets";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const config = await getSalonConfig();
   return NextResponse.json({ config });

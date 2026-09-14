@@ -1,9 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { UserSession } from "./types";
+import { UserSession, RolAgente } from "./types";
 
+const jwtSecretString = process.env.JWT_SECRET;
+if (!jwtSecretString && process.env.NODE_ENV === "production") {
+  throw new Error("FATAL: JWT_SECRET no está configurado en producción");
+}
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "salon_crm_default_secret_dev_32chars_key!"
+  jwtSecretString || "salon_crm_default_secret_dev_32chars_key!"
 );
 
 export const AUTH_COOKIE_NAME = "salon_crm_session";
@@ -23,7 +27,7 @@ export async function verifySessionToken(token: string): Promise<UserSession | n
       userId: payload.userId as string,
       nombre: payload.nombre as string,
       tipo: payload.tipo as "agente" | "cliente",
-      rol: payload.rol as any,
+      rol: (payload.rol as RolAgente) || "agente",
       especialidades: payload.especialidades as string[] | undefined,
     };
   } catch {

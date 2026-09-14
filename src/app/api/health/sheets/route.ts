@@ -1,15 +1,26 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { google } from "googleapis";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  if (user.rol !== "admin") {
+    return NextResponse.json({ error: "Prohibido" }, { status: 403 });
+  }
+
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let privateKey = process.env.GOOGLE_PRIVATE_KEY;
   const sheetId = process.env.GOOGLE_SHEET_ID;
+  
+  const redactedEmail = email ? (email.length > 10 ? email.substring(0, 10) + "..." : email) : null;
 
   const configCheck = {
-    GOOGLE_SERVICE_ACCOUNT_EMAIL: email ? `✓ Configurado (${email})` : "✗ NO CONFIGURADO",
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: email ? `✓ Configurado (${redactedEmail})` : "✗ NO CONFIGURADO",
     GOOGLE_PRIVATE_KEY: privateKey ? `✓ Configurado (${privateKey.length} caracteres)` : "✗ NO CONFIGURADO",
     GOOGLE_SHEET_ID: sheetId ? `✓ Configurado (${sheetId})` : "✗ NO CONFIGURADO",
   };

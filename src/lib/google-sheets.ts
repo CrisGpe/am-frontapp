@@ -11,6 +11,7 @@ import {
   CitaRecord,
   SalonConfig,
   TurnoEspera,
+  RolAgente,
 } from "./types";
 import {
   MOCK_AGENTES,
@@ -21,6 +22,7 @@ import {
   MOCK_BORRADOR,
   INITIAL_CONFIG,
 } from "./mock-data";
+import { getTodayDateString } from "./utils";
 
 // Fallback en memoria si no hay credenciales de Google configuradas aún
 class InMemoryStore {
@@ -63,6 +65,7 @@ class InMemoryStore {
       id_servicio: "SV-001",
       nombre_servicio: "Corte y Peinado Dama",
       especialidad_requerida: "estilista",
+      fecha: "2026-09-13",
       hora_llegada: "11:20",
       estado: "en_espera",
       notas: "Cliente casual que entró al salón.",
@@ -73,6 +76,7 @@ class InMemoryStore {
       id_servicio: "SV-002",
       nombre_servicio: "Corte Caballero & Perfilado",
       especialidad_requerida: "estilista",
+      fecha: "2026-09-13",
       hora_llegada: "11:35",
       estado: "en_espera",
     },
@@ -136,8 +140,8 @@ export async function getAgentes(): Promise<Agente[]> {
       id: r[0] || "",
       nombre: r[1] || "",
       pin: r[2] || "",
-      rol: (r[3] as any) || "agente",
-      especialidades: (r[4] || "").split(",").map((s: string) => s.trim().toLowerCase()),
+      rol: (r[3] === "admin" ? "admin" : "agente") as RolAgente,
+      especialidades: (r[4] || "").split(",").map((s: string) => s.trim().toLowerCase()).filter((s: string) => s.length > 0),
       telefono: r[5] || "",
       email: r[6] || "",
       horario_lun: r[7] || "",
@@ -434,16 +438,35 @@ export async function updateBorradorEntry(
   id_oatc: string,
   updates: Partial<BorradorEntry>
 ): Promise<BorradorEntry | null> {
+  const client = getSheetsClient();
+  let existingEntry: BorradorEntry | null = null;
   const index = memoryStore.borrador.findIndex((e) => e.id_oatc === id_oatc);
-  if (index === -1) return null;
 
-  memoryStore.borrador[index] = {
-    ...memoryStore.borrador[index],
+  if (index !== -1) {
+    existingEntry = memoryStore.borrador[index];
+  } else if (client) {
+    const borradorActual = await getBorrador();
+    const found = borradorActual.find((e) => e.id_oatc === id_oatc);
+    if (found) {
+      memoryStore.borrador.push(found);
+      existingEntry = found;
+    }
+  }
+
+  if (!existingEntry) return null;
+
+  const updated: BorradorEntry = {
+    ...existingEntry,
     ...updates,
   };
-  const updated = memoryStore.borrador[index];
 
-  const client = getSheetsClient();
+  const storeIdx = memoryStore.borrador.findIndex((e) => e.id_oatc === id_oatc);
+  if (storeIdx !== -1) {
+    memoryStore.borrador[storeIdx] = updated;
+  } else {
+    memoryStore.borrador.push(updated);
+  }
+
   if (client) {
     try {
       const res = await client.sheets.spreadsheets.values.get({
@@ -494,11 +517,64 @@ export async function updateBorradorEntry(
 // TURNOS
 // ----------------------------------------------------
 export async function getTurnos(): Promise<TurnoEspera[]> {
-  return memoryStore.turnos;
+  const client = getSheetsClient();
+  if (!client) return memoryStore.turnos;
+
+  try {
+    const res = await client.sheets.spreadsheets.values.get({
+      spreadsheetId: client.sheetId,
+      range: "Turnos!A2:K",
+    });
+    const rows = res.data.values || [];
+    if (rows.length === 0) return memoryStore.turnos;
+
+    return rows.map((r) => ({
+      id: r[0] || "",
+      nombre_consumidor: r[1] || "",
+      id_servicio: r[2] || "",
+      nombre_servicio: r[3] || "",
+      especialidad_requerida: r[4] || "",
+      fecha: r[5] || "",
+      hora_llegada: r[6] || "",
+      estado: (r[7] as any) || "en_espera",
+      notas: r[8] || undefined,
+      agente_asignado_id: r[9] || undefined,
+      id_oatc_creada: r[10] || undefined,
+    }));
+  } catch (err) {
+    console.warn("Fallback a memoria para Turnos:", err);
+    return memoryStore.turnos;
+  }
 }
 
 export async function addTurno(turno: TurnoEspera): Promise<TurnoEspera> {
   memoryStore.turnos.push(turno);
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const row = [
+        turno.id,
+        turno.nombre_consumidor,
+        turno.id_servicio,
+        turno.nombre_servicio,
+        turno.especialidad_requerida,
+        turno.fecha,
+        turno.hora_llegada,
+        turno.estado,
+        turno.notas || "",
+        turno.agente_asignado_id || "",
+        turno.id_oatc_creada || "",
+      ];
+      await client.sheets.spreadsheets.values.append({
+        spreadsheetId: client.sheetId,
+        range: "Turnos!A2:K",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+    } catch (err) {
+      console.error("Error guardando Turno en Google Sheets:", err);
+    }
+  }
   return turno;
 }
 
@@ -507,9 +583,48 @@ export async function updateTurno(
   updates: Partial<TurnoEspera>
 ): Promise<TurnoEspera | null> {
   const idx = memoryStore.turnos.findIndex((t) => t.id === id);
-  if (idx === -1) return null;
-  memoryStore.turnos[idx] = { ...memoryStore.turnos[idx], ...updates };
-  return memoryStore.turnos[idx];
+  if (idx !== -1) {
+    memoryStore.turnos[idx] = { ...memoryStore.turnos[idx], ...updates };
+  }
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Turnos!A2:K",
+      });
+      const rows = res.data.values || [];
+      const rowIndex = rows.findIndex((r) => r[0] === id);
+      if (rowIndex !== -1) {
+        const rowNum = rowIndex + 2;
+        const current = rows[rowIndex];
+        const updatedRow = [
+          current[0],
+          updates.nombre_consumidor !== undefined ? updates.nombre_consumidor : current[1],
+          updates.id_servicio !== undefined ? updates.id_servicio : current[2],
+          updates.nombre_servicio !== undefined ? updates.nombre_servicio : current[3],
+          updates.especialidad_requerida !== undefined ? updates.especialidad_requerida : current[4],
+          updates.fecha !== undefined ? updates.fecha : current[5],
+          updates.hora_llegada !== undefined ? updates.hora_llegada : current[6],
+          updates.estado !== undefined ? updates.estado : current[7],
+          updates.notas !== undefined ? (updates.notas || "") : (current[8] || ""),
+          updates.agente_asignado_id !== undefined ? (updates.agente_asignado_id || "") : (current[9] || ""),
+          updates.id_oatc_creada !== undefined ? (updates.id_oatc_creada || "") : (current[10] || ""),
+        ];
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Turnos!A${rowNum}:K${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [updatedRow] },
+        });
+      }
+    } catch (err) {
+      console.error("Error actualizando Turno en Google Sheets:", err);
+    }
+  }
+
+  return idx !== -1 ? memoryStore.turnos[idx] : null;
 }
 
 export async function updateAgenteDisponibilidad(
@@ -883,7 +998,7 @@ export interface ResumenCierre {
 
 export async function ejecutarCierreDeDia(): Promise<ResumenCierre> {
   const client = getSheetsClient();
-  const fechaHoy = new Date().toISOString().split("T")[0];
+  const fechaHoy = getTodayDateString("America/Lima");
   const timestamp = new Date().toISOString();
 
   const oatcsAMigrar = await getBorrador();
@@ -892,70 +1007,78 @@ export async function ejecutarCierreDeDia(): Promise<ResumenCierre> {
     0
   );
 
-  // 1. Migrar a histórico OATC
+  // 1. Migrar en memoria
   for (const item of oatcsAMigrar) {
     const registroOATC: OATCRecord = {
       ...item,
       migrado_en: timestamp,
     };
     memoryStore.oatc.push(registroOATC);
+  }
+
+  // 2. Batch append a histórico OATC en Google Sheets
+  let migradoExitoso = true;
+  if (client && oatcsAMigrar.length > 0) {
+    try {
+      const rows = oatcsAMigrar.map((item) => [
+        item.id_oatc,
+        item.fecha,
+        item.hora_inicio,
+        item.tipo_consumidor,
+        item.id_cliente || "",
+        item.nombre_consumidor,
+        item.id_agente,
+        item.nombre_agente,
+        item.id_servicio,
+        item.nombre_servicio,
+        item.etapa,
+        item.precio_final,
+        item.productos_usados || "",
+        item.insumos_usados || "",
+        item.productos_vendidos || "",
+        item.correlativo_sistema,
+        item.comprobante_externo || "",
+        item.notas || "",
+        item.hora_fin || "",
+        timestamp,
+      ]);
+
+      await client.sheets.spreadsheets.values.append({
+        spreadsheetId: client.sheetId,
+        range: "OATC!A2:T",
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: rows },
+      });
+    } catch (err) {
+      migradoExitoso = false;
+      console.error("Error migrando OATC por lote en Google Sheets:", err);
+      throw new Error("Error al migrar el borrador a OATC en Google Sheets. El borrador no fue alterado para evitar pérdida de datos.");
+    }
+  }
+
+  // 3. Limpiar la hoja Borrador SOLO si la migración a OATC fue exitosa
+  if (migradoExitoso) {
+    memoryStore.borrador = [];
 
     if (client) {
       try {
-        const row = [
-          item.id_oatc,
-          item.fecha,
-          item.hora_inicio,
-          item.tipo_consumidor,
-          item.id_cliente || "",
-          item.nombre_consumidor,
-          item.id_agente,
-          item.nombre_agente,
-          item.id_servicio,
-          item.nombre_servicio,
-          item.etapa,
-          item.precio_final,
-          item.productos_usados || "",
-          item.insumos_usados || "",
-          item.productos_vendidos || "",
-          item.correlativo_sistema,
-          item.comprobante_externo || "",
-          item.notas || "",
-          item.hora_fin || "",
-          timestamp,
-        ];
-
-        await client.sheets.spreadsheets.values.append({
+        await client.sheets.spreadsheets.values.clear({
           spreadsheetId: client.sheetId,
-          range: "OATC!A2:T",
-          valueInputOption: "USER_ENTERED",
-          requestBody: { values: [row] },
+          range: "Borrador!A2:S",
         });
       } catch (err) {
-        console.error("Error migrando fila a OATC en Google Sheets:", err);
+        console.error("Error limpiando Borrador en Google Sheets:", err);
       }
     }
   }
 
-  // 2. Limpiar la hoja Borrador
-  memoryStore.borrador = [];
-
-  if (client) {
-    try {
-      await client.sheets.spreadsheets.values.clear({
-        spreadsheetId: client.sheetId,
-        range: "Borrador!A2:S",
-      });
-    } catch (err) {
-      console.error("Error limpiando Borrador en Google Sheets:", err);
-    }
-  }
+  const asistenciasHoy = await getAsistenciaHoy(fechaHoy);
 
   return {
     fecha: fechaHoy,
     totalOatcsMigradas: oatcsAMigrar.length,
     totalVentasMigradas: totalVentas,
-    totalAsistencias: memoryStore.asistencia.length,
+    totalAsistencias: asistenciasHoy.length || memoryStore.asistencia.length,
     migradoEn: timestamp,
   };
 }

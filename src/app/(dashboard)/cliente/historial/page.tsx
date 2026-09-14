@@ -18,6 +18,7 @@ export default function ClienteHistorialPage() {
   const [user, setUser] = useState<UserSession | null>(null);
   const [historial, setHistorial] = useState<BorradorEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     cargarHistorial();
@@ -26,6 +27,7 @@ export default function ClienteHistorialPage() {
   const cargarHistorial = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [resUser, resHist] = await Promise.all([
         fetch("/api/auth/me"),
         fetch("/api/cliente/historial"),
@@ -33,9 +35,14 @@ export default function ClienteHistorialPage() {
       const dataUser = await resUser.json();
       const dataHist = await resHist.json();
 
+      if (!resHist.ok) {
+        throw new Error(dataHist.error || "Error al cargar historial");
+      }
+
       if (dataUser.user) setUser(dataUser.user);
       if (dataHist.historial) setHistorial(dataHist.historial);
-    } catch (err) {
+    } catch (err: any) {
+      setError(err.message || "Error de red al cargar el historial");
       console.error("Error cargando historial:", err);
     } finally {
       setLoading(false);
@@ -63,6 +70,19 @@ export default function ClienteHistorialPage() {
         {loading ? (
           <div className="py-12 text-center text-sm text-earth-500">
             Consultando historial de atenciones...
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 border border-dashed border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 rounded-2xl">
+            <p className="text-sm font-bold text-red-600 dark:text-red-400">
+              Error al cargar el historial
+            </p>
+            <p className="text-xs text-red-500 mt-1">{error}</p>
+            <button
+              onClick={cargarHistorial}
+              className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-200"
+            >
+              Intentar nuevamente
+            </button>
           </div>
         ) : historial.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-earth-200 dark:border-earth-800 rounded-2xl">

@@ -126,9 +126,12 @@ export interface TurnoEspera {
   id_servicio: string;
   nombre_servicio: string;
   especialidad_requerida: string;
+  fecha: string;
   hora_llegada: string;
   estado: "en_espera" | "atendido" | "cancelado";
   notas?: string;
+  agente_asignado_id?: string;
+  id_oatc_creada?: string;
 }
 
 export interface SalonConfig {
@@ -144,4 +147,23 @@ export interface UserSession {
   tipo: "agente" | "cliente";
   rol?: RolAgente;
   especialidades?: string[];
+}
+
+export interface CierreResumen {
+  fecha: string;
+  totalOatcsMigradas: number;
+  totalVentasMigradas: number;
+  totalAsistencias: number;
+  mensaje: string;
+}
+
+export interface TurnoConSugerencia extends TurnoEspera {
+  servicio?: Servicio;
+  agenteSugerido?: {
+    id: string;
+    nombre: string;
+    prioridadScore: number;
+    enAtencionActiva: boolean;
+    especialidadesMatch: boolean;
+  };
 }

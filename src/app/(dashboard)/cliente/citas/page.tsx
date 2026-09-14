@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Servicio, Agente, UserSession } from "@/lib/types";
+import { Servicio, Agente, UserSession, CitaRecord } from "@/lib/types";
 import { formatCurrency, getTodayDateString } from "@/lib/utils";
 import { TimeSlot } from "@/lib/agenda-utils";
 import {
@@ -15,13 +15,14 @@ import {
   ChevronRight,
   XCircle,
   CalendarCheck,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function ClienteCitasPage() {
   const [user, setUser] = useState<UserSession | null>(null);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [agentes, setAgentes] = useState<Agente[]>([]);
-  const [citas, setCitas] = useState<any[]>([]);
+  const [citas, setCitas] = useState<CitaRecord[]>([]);
 
   // Estado del flujo de reserva
   const [servicioSeleccionado, setServicioSeleccionado] = useState<Servicio | null>(null);
@@ -35,6 +36,9 @@ export default function ClienteCitasPage() {
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [citaACancelar, setCitaACancelar] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState(false);
 
   useEffect(() => {
     setFechaSeleccionada(getTodayDateString());
@@ -147,16 +151,21 @@ export default function ClienteCitasPage() {
     }
   };
 
-  const handleCancelarCita = async (idCita: string) => {
+  const handleCancelarCita = async () => {
+    if (!citaACancelar) return;
+    setCancelando(true);
     try {
       await fetch("/api/citas", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_cita: idCita, estado: "cancelada" }),
+        body: JSON.stringify({ id_cita: citaACancelar, estado: "cancelada" }),
       });
-      cargarDatos();
+      await cargarDatos();
+      setCitaACancelar(null);
     } catch (err) {
       console.error("Error cancelando cita:", err);
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -424,7 +433,7 @@ export default function ClienteCitasPage() {
                       </div>
 
                       <h4 className="font-bold text-earth-900 dark:text-cream-100">
-                        {cita.nombre_servicio}
+                        {servicios.find(s => s.id === cita.id_servicio)?.nombre || cita.id_servicio}
                       </h4>
 
                       <div className="text-earth-600 dark:text-earth-400 space-y-0.5 text-[11px]">
@@ -432,7 +441,7 @@ export default function ClienteCitasPage() {
                           📅 Fecha: <strong>{cita.fecha}</strong> a las <strong>{cita.hora} hrs</strong>
                         </p>
                         <p>
-                          👤 Especialista: <strong>{cita.nombre_agente}</strong>
+                          👤 Especialista: <strong>{agentes.find(a => a.id === cita.id_agente)?.nombre || cita.id_agente}</strong>
                         </p>
                       </div>
 
@@ -440,8 +449,8 @@ export default function ClienteCitasPage() {
                         <div className="pt-2 text-right">
                           <button
                             type="button"
-                            onClick={() => handleCancelarCita(cita.id)}
-                            className="text-[11px] text-red-600 hover:text-red-800 font-semibold"
+                            onClick={() => setCitaACancelar(cita.id)}
+                            className="text-[11px] text-red-600 hover:text-red-800 font-semibold transition-colors"
                           >
                             Cancelar cita
                           </button>
@@ -455,6 +464,50 @@ export default function ClienteCitasPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmación de cancelación */}
+      {citaACancelar && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => !cancelando && setCitaACancelar(null)}
+        >
+          <div 
+            className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-sm shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-cancel-title"
+          >
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <AlertTriangle className="w-6 h-6 shrink-0" />
+              <h3 id="modal-cancel-title" className="font-bold text-base text-earth-900 dark:text-cream-100">
+                ¿Cancelar Cita?
+              </h3>
+            </div>
+            <p className="text-xs text-earth-600 dark:text-earth-400 mb-5">
+              Esta acción no se puede deshacer. Perderás tu horario reservado.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCitaACancelar(null)}
+                disabled={cancelando}
+                className="px-4 py-2 rounded-xl border border-earth-200 text-xs font-semibold text-earth-700 hover:bg-earth-50 disabled:opacity-50"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelarCita}
+                disabled={cancelando}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md disabled:opacity-50"
+              >
+                {cancelando ? "Cancelando..." : "Sí, Cancelar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

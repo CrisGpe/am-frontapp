@@ -40,6 +40,16 @@ export function NuevaOATCModal({
     }
   }, [isOpen, currentAgent.id]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !loading) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, loading, onClose]);
+
   const cargarDatos = async () => {
     try {
       const [resCli, resServ, resAg] = await Promise.all([
@@ -71,8 +81,8 @@ export function NuevaOATCModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!servicioSeleccionadoId) {
-      setError("Por favor selecciona un servicio.");
+    if (!servicioSeleccionado) {
+      setError("Por favor selecciona un servicio válido.");
       return;
     }
 
@@ -97,8 +107,8 @@ export function NuevaOATCModal({
     setLoading(true);
     setError(null);
 
-    const hoy = getTodayDateString();
-    const hora = getCurrentTimeString();
+    const hoy = getTodayDateString("America/Lima");
+    const hora = getCurrentTimeString("America/Lima");
     const randomCorr = Math.floor(100 + Math.random() * 900);
     const idOatc = `OATC-${hoy.replace(/-/g, "")}-${randomCorr}`;
 
@@ -115,10 +125,10 @@ export function NuevaOATCModal({
           nombre_consumidor: nombreConsumidor,
           id_agente: agenteAsignado.id,
           nombre_agente: agenteAsignado.nombre,
-          id_servicio: servicioSeleccionado!.id,
-          nombre_servicio: servicioSeleccionado!.nombre,
+          id_servicio: servicioSeleccionado.id,
+          nombre_servicio: servicioSeleccionado.nombre,
           etapa: "asesoria",
-          precio_final: servicioSeleccionado!.precio_base,
+          precio_final: servicioSeleccionado.precio_base,
           correlativo_sistema: `OATC-${randomCorr}`,
           notas: notas.trim(),
         }),
@@ -141,8 +151,18 @@ export function NuevaOATCModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-nueva-oatc-title"
+        className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+      >
         {/* Header */}
         <div className="p-6 border-b border-earth-100 dark:border-earth-800 flex items-center justify-between bg-earth-50/50 dark:bg-earth-950/50">
           <div className="flex items-center gap-3">
@@ -150,7 +170,7 @@ export function NuevaOATCModal({
               <Scissors className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-earth-900 dark:text-cream-100">
+              <h2 id="modal-nueva-oatc-title" className="text-lg font-bold text-earth-900 dark:text-cream-100">
                 Nueva Orden de Atención
               </h2>
               <span className="text-xs text-earth-500">
@@ -160,7 +180,9 @@ export function NuevaOATCModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-earth-400 hover:text-earth-700 dark:hover:text-earth-200 transition-colors"
+            aria-label="Cerrar modal"
+            disabled={loading}
+            className="p-2 rounded-xl text-earth-400 hover:text-earth-700 dark:hover:text-earth-200 transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>

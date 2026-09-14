@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { BorradorEntry, Producto, Insumo } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getCurrentTimeString } from "@/lib/utils";
 import {
   X,
   CreditCard,
@@ -13,6 +13,7 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
+  Droplet,
 } from "lucide-react";
 
 interface CobranzaModalProps {
@@ -48,6 +49,16 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
     }
   }, [isOpen, oatc]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !loading) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, loading, onClose]);
+
   const cargarCatalogos = async () => {
     try {
       const [resProd, resIns] = await Promise.all([
@@ -59,19 +70,19 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
       if (dataProd.productos) setProductosDisponibles(dataProd.productos);
       if (dataIns.insumos) setInsumosDisponibles(dataIns.insumos);
     } catch (err) {
-      console.error("Error cargando inventario:", err);
+      console.error("Error cargando catálogos para cobranza:", err);
     }
   };
 
   if (!isOpen || !oatc) return null;
 
   // Cálculo de totales
-  const totalProductosVendidos = productosVendidos.reduce((acc, curr) => {
-    const prod = productosDisponibles.find((p) => p.id === curr.id);
-    return acc + (prod ? prod.precio_venta * curr.cantidad : 0);
+  const totalProductos = productosVendidos.reduce((acc, item) => {
+    const prod = productosDisponibles.find((p) => p.id === item.id);
+    return acc + (prod ? prod.precio_venta * item.cantidad : 0);
   }, 0);
 
-  const totalGeneral = precioServicio + totalProductosVendidos;
+  const totalGeneral = Number(precioServicio || 0) + totalProductos;
 
   const handleAddProductoVendido = (prodId: string) => {
     const existing = productosVendidos.find((p) => p.id === prodId);
@@ -97,9 +108,18 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
     }
   };
 
+  const handleRemoveInsumo = (insumoId: string) => {
+    setInsumosUsados(insumosUsados.filter((i) => i.id !== insumoId));
+  };
+
   const handleConfirmarCobro = async () => {
     if (!comprobanteExterno.trim()) {
       setError("Es obligatorio ingresar el número de comprobante de pago externo (ej: Ticket, Boleta o Factura).");
+      return;
+    }
+
+    if (isNaN(precioServicio) || precioServicio < 0) {
+      setError("El precio del servicio debe ser un número válido mayor o igual a 0.");
       return;
     }
 
@@ -127,7 +147,7 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
             productos_vendidos: prodVendidosStr,
             insumos_usados: insumosStr,
             notas: notas.trim(),
-            hora_fin: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+            hora_fin: getCurrentTimeString("America/Lima"),
           },
         }),
       });
@@ -149,8 +169,18 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-cobranza-title"
+        className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+      >
         {/* Header */}
         <div className="p-6 border-b border-earth-100 dark:border-earth-800 flex items-center justify-between bg-earth-50/50 dark:bg-earth-950/50">
           <div>
@@ -162,13 +192,15 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
                 Etapa: Cobranza
               </span>
             </div>
-            <h2 className="text-xl font-bold text-earth-900 dark:text-cream-100 mt-1">
+            <h2 id="modal-cobranza-title" className="text-xl font-bold text-earth-900 dark:text-cream-100 mt-1">
               Finalizar Atención & Cobro
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-earth-400 hover:text-earth-700 dark:hover:text-earth-200 hover:bg-earth-100 dark:hover:bg-earth-800 transition-colors"
+            aria-label="Cerrar modal"
+            disabled={loading}
+            className="p-2 rounded-xl text-earth-400 hover:text-earth-700 dark:hover:text-earth-200 hover:bg-earth-100 dark:hover:bg-earth-800 transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -288,6 +320,60 @@ export function CobranzaModal({ isOpen, onClose, oatc, onSuccess }: CobranzaModa
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Insumos utilizados en el servicio */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Droplet className="w-3.5 h-3.5 text-earth-500" />
+                Insumos Utilizados (Opcional)
+              </label>
+            </div>
+            <div className="flex gap-2 mb-2">
+              <select
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleAddInsumo(e.target.value);
+                    e.target.value = "";
+                  }
+                }}
+                className="w-full text-xs p-2.5 rounded-xl border border-earth-200 dark:border-earth-800 bg-white dark:bg-earth-950 text-earth-800 dark:text-cream-200"
+              >
+                <option value="">+ Registrar insumo usado (tinte, decolorante, etc.)...</option>
+                {insumosDisponibles.map((ins) => (
+                  <option key={ins.id} value={ins.id}>
+                    {ins.nombre} ({ins.unidad_medida})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {insumosUsados.length > 0 && (
+              <div className="space-y-1.5 mt-2">
+                {insumosUsados.map((item) => {
+                  const ins = insumosDisponibles.find((i) => i.id === item.id);
+                  if (!ins) return null;
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-earth-50 dark:bg-earth-950 text-xs"
+                    >
+                      <span>
+                        {ins.nombre} ({item.cantidad})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInsumo(item.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   );
                 })}

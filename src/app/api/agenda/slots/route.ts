@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAgentes, getServicios, getCitas } from "@/lib/google-sheets";
 import { calcularSlotsDisponibles, obtenerHorarioDia } from "@/lib/agenda-utils";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
@@ -38,7 +40,7 @@ export async function GET(req: NextRequest) {
   }
 
   const horario = obtenerHorarioDia(agente, fecha);
-  const slots = calcularSlotsDisponibles(agente, servicio, fecha, citas);
+  const slots = calcularSlotsDisponibles(agente, servicio, fecha, citas, servicios);
 
   return NextResponse.json({
     fecha,

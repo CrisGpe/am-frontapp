@@ -35,6 +35,16 @@ export default function AdminAgentesPage() {
     cargarAgentes();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && modalOpen && !submitting) {
+        setModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalOpen, submitting]);
+
   const cargarAgentes = async () => {
     try {
       setLoading(true);
@@ -51,11 +61,11 @@ export default function AdminAgentesPage() {
   const handleCrearAgente = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !pin.trim()) {
-      setError("Nombre y PIN de 4 dígitos son obligatorios");
+      setError("Nombre y PIN son obligatorios");
       return;
     }
 
-    if (pin.trim().length !== 4) {
+    if (!/^\d{4}$/.test(pin.trim())) {
       setError("El PIN debe tener exactamente 4 dígitos numéricos");
       return;
     }
@@ -134,6 +144,14 @@ export default function AdminAgentesPage() {
       </div>
 
       {/* Grid de Colaboradores */}
+      {loading ? (
+        <div className="py-20 flex flex-col items-center justify-center space-y-4">
+          <div className="w-8 h-8 border-4 border-earth-300 border-t-earth-800 rounded-full animate-spin"></div>
+          <p className="text-sm text-earth-600 dark:text-earth-400 font-medium animate-pulse">
+            Cargando colaboradores...
+          </p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {agentes.map((a) => (
           <div
@@ -194,26 +212,42 @@ export default function AdminAgentesPage() {
           </div>
         ))}
       </div>
+      )}
 
       {/* Modal Nuevo Colaborador */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-md shadow-2xl p-6">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => !submitting && setModalOpen(false)}
+        >
+          <div 
+            className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-md shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-colaborador-title"
+          >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-earth-900 dark:text-cream-100">
+              <h2 id="modal-colaborador-title" className="text-lg font-bold text-earth-900 dark:text-cream-100">
                 Dar de Alta Colaborador
               </h2>
-              <button onClick={() => setModalOpen(false)} className="text-earth-400">
+              <button 
+                onClick={() => setModalOpen(false)} 
+                className="text-earth-400 hover:text-earth-600"
+                aria-label="Cerrar"
+                disabled={submitting}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCrearAgente} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
+                <label htmlFor="nombre" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
                   Nombre Completo
                 </label>
                 <input
+                  id="nombre"
                   type="text"
                   placeholder="Ej: Laura Morales..."
                   value={nombre}
@@ -224,10 +258,11 @@ export default function AdminAgentesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
+                  <label htmlFor="pin" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
                     PIN (4 Dígitos)
                   </label>
                   <input
+                    id="pin"
                     type="text"
                     maxLength={4}
                     value={pin}
@@ -236,12 +271,13 @@ export default function AdminAgentesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
+                  <label htmlFor="rol" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
                     Rol
                   </label>
                   <select
+                    id="rol"
                     value={rol}
-                    onChange={(e) => setRol(e.target.value as any)}
+                    onChange={(e) => setRol(e.target.value as "agente" | "admin")}
                     className="w-full p-2.5 text-xs rounded-xl border border-earth-200 dark:border-earth-800 bg-white dark:bg-earth-950 text-earth-900 dark:text-cream-100"
                   >
                     <option value="agente">Colaborador</option>
@@ -251,10 +287,11 @@ export default function AdminAgentesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
+                <label htmlFor="especialidades" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
                   Especialidades (separadas por comas)
                 </label>
                 <input
+                  id="especialidades"
                   type="text"
                   placeholder="estilista, colorista, manicurista..."
                   value={especialidadesStr}
@@ -265,10 +302,11 @@ export default function AdminAgentesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
+                  <label htmlFor="telefono" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
                     Teléfono
                   </label>
                   <input
+                    id="telefono"
                     type="text"
                     placeholder="+52 55..."
                     value={telefono}
@@ -277,10 +315,11 @@ export default function AdminAgentesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
+                  <label htmlFor="email" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-1">
                     Email
                   </label>
                   <input
+                    id="email"
                     type="email"
                     placeholder="correo@..."
                     value={email}
@@ -301,7 +340,8 @@ export default function AdminAgentesPage() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-earth-200 text-xs font-semibold text-earth-700 hover:bg-earth-50"
+                  disabled={submitting}
+                  className="px-4 py-2.5 rounded-xl border border-earth-200 text-xs font-semibold text-earth-700 hover:bg-earth-50 disabled:opacity-50"
                 >
                   Cancelar
                 </button>

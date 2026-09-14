@@ -2,8 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgentes, getClientes } from "@/lib/google-sheets";
 import { createSessionToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
+const loginAttempts = new Map<string, { count: number, lastAttempt: number }>();
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for') || 'unknown';
+    const now = Date.now();
+    const attempt = loginAttempts.get(ip) || { count: 0, lastAttempt: now };
+    
+    if (now - attempt.lastAttempt > 5 * 60 * 1000) {
+      attempt.count = 0;
+    }
+    
+    if (attempt.count >= 5) {
+      return NextResponse.json({ error: "Demasiados intentos. Espera 5 minutos." }, { status: 429 });
+    }
+    
+    attempt.count++;
+    attempt.lastAttempt = now;
+    loginAttempts.set(ip, attempt);
+
     const body = await req.json();
     const { pin, tipo } = body;
 
@@ -12,6 +32,10 @@ export async function POST(req: NextRequest) {
         { error: "El PIN de 4 dígitos es requerido" },
         { status: 400 }
       );
+    }
+    
+    if (!/^\d{4}$/.test(pin.trim())) {
+      return NextResponse.json({ error: "PIN debe ser 4 dígitos numéricos" }, { status: 400 });
     }
 
     if (tipo === "agente") {

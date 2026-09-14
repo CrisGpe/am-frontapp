@@ -25,6 +25,8 @@ export default function AgenteDashboardPage() {
   const [oatcs, setOatcs] = useState<BorradorEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroEtapa, setFiltroEtapa] = useState<string>("todas");
+  const [error, setError] = useState<string | null>(null);
+  const [updatingOatc, setUpdatingOatc] = useState<string | null>(null);
 
   // Modales
   const [cobranzaOatc, setCobranzaOatc] = useState<BorradorEntry | null>(null);
@@ -48,12 +50,14 @@ export default function AgenteDashboardPage() {
   const cargarBorrador = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await fetch("/api/borrador");
       const data = await res.json();
       if (data.borrador) {
         setOatcs(data.borrador);
       }
     } catch (err) {
+      setError("Error cargando borrador");
       console.error("Error cargando borrador:", err);
     } finally {
       setLoading(false);
@@ -62,6 +66,8 @@ export default function AgenteDashboardPage() {
 
   const handleCambiarEtapa = async (id_oatc: string, nuevaEtapa: EtapaOATC) => {
     try {
+      setUpdatingOatc(id_oatc);
+      setError(null);
       const res = await fetch("/api/borrador", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -72,10 +78,16 @@ export default function AgenteDashboardPage() {
       });
 
       if (res.ok) {
-        cargarBorrador();
+        await cargarBorrador();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Error al cambiar de etapa");
       }
     } catch (err) {
+      setError("Error de red al cambiar de etapa");
       console.error("Error cambiando etapa:", err);
+    } finally {
+      setUpdatingOatc(null);
     }
   };
 
@@ -135,13 +147,21 @@ export default function AgenteDashboardPage() {
           </button>
           <button
             onClick={() => setNuevaOatcOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-earth-500 hover:bg-earth-600 text-white font-bold text-sm shadow-md shadow-earth-500/20 active:scale-95 transition-all"
+            disabled={!user?.userId}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-earth-500 hover:bg-earth-600 text-white font-bold text-sm shadow-md shadow-earth-500/20 active:scale-95 transition-all disabled:opacity-50"
+            title={!user?.userId ? "Cargando sesión..." : "Nueva orden"}
           >
             <PlusCircle className="w-4 h-4" />
             <span>Nueva OATC</span>
           </button>
         </div>
       </div>
+
+      {error && (
+        <div role="alert" className="p-4 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 text-red-600 text-xs flex items-center gap-2 font-semibold">
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -216,7 +236,7 @@ export default function AgenteDashboardPage() {
               No hay órdenes de atención en esta etapa
             </p>
             <p className="text-xs text-earth-400 mt-1">
-              Puedes crear una nueva usando el botón superior "Nueva OATC"
+              Puedes crear una nueva usando el botón superior &quot;Nueva OATC&quot;
             </p>
           </div>
         ) : (
@@ -281,30 +301,33 @@ export default function AgenteDashboardPage() {
                   {oatc.etapa === "asesoria" && (
                     <button
                       onClick={() => handleCambiarEtapa(oatc.id_oatc, "atencion")}
-                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                      disabled={updatingOatc === oatc.id_oatc}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
                     >
                       <Play className="w-3.5 h-3.5" />
-                      Comenzar Atención
+                      {updatingOatc === oatc.id_oatc ? "Actualizando..." : "Comenzar Atención"}
                     </button>
                   )}
 
                   {oatc.etapa === "atencion" && (
                     <button
                       onClick={() => handleCambiarEtapa(oatc.id_oatc, "fin_atencion")}
-                      className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                      disabled={updatingOatc === oatc.id_oatc}
+                      className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
                     >
                       <CheckCircle className="w-3.5 h-3.5" />
-                      Finalizar Atención del Servicio
+                      {updatingOatc === oatc.id_oatc ? "Actualizando..." : "Finalizar Atención del Servicio"}
                     </button>
                   )}
 
                   {oatc.etapa === "fin_atencion" && (
                     <button
                       onClick={() => handleCambiarEtapa(oatc.id_oatc, "cobranza")}
-                      className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+                      disabled={updatingOatc === oatc.id_oatc}
+                      className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
                     >
                       <CreditCard className="w-3.5 h-3.5" />
-                      Pasar a Cobranza / Caja
+                      {updatingOatc === oatc.id_oatc ? "Actualizando..." : "Pasar a Cobranza / Caja"}
                     </button>
                   )}
 
@@ -358,7 +381,7 @@ export default function AgenteDashboardPage() {
             cargarBorrador();
           }}
           currentAgent={{
-            id: user?.userId || "AG-001",
+            id: user?.userId || "",
             nombre: user?.nombre || "Colaborador",
           }}
         />

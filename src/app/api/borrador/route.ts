@@ -3,10 +3,12 @@ import { getBorrador, addBorradorEntry, updateBorradorEntry } from "@/lib/google
 import { getCurrentUser } from "@/lib/auth";
 import { BorradorEntry } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!user || (user.tipo !== "agente" && user.rol !== "admin")) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   const data = await getBorrador();
@@ -15,8 +17,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!user || (user.tipo !== "agente" && user.rol !== "admin")) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   try {
@@ -33,8 +35,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!user || (user.tipo !== "agente" && user.rol !== "admin")) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   try {

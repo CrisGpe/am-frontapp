@@ -40,6 +40,9 @@ export function PinPad({ onComplete, isLoading = false, error = null, onClearErr
   // Soporte para teclado físico (escritorio / laptop)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
       if (e.key >= "0" && e.key <= "9") {
         handleDigit(e.key);
       } else if (e.key === "Backspace") {
@@ -68,7 +71,11 @@ export function PinPad({ onComplete, isLoading = false, error = null, onClearErr
   return (
     <div className="w-full max-w-xs mx-auto flex flex-col items-center">
       {/* Indicadores de dígitos (Dots) */}
-      <div className="flex items-center justify-center gap-4 my-6">
+      <div 
+        className="flex items-center justify-center gap-4 my-6"
+        role="status"
+        aria-label={`${pin.length} de 4 dígitos ingresados`}
+      >
         {[0, 1, 2, 3].map((index) => {
           const filled = pin.length > index;
           return (
@@ -105,6 +112,7 @@ export function PinPad({ onComplete, isLoading = false, error = null, onClearErr
                 onClick={handleClear}
                 disabled={isLoading || pin.length === 0}
                 className="h-16 rounded-2xl flex items-center justify-center font-medium text-earth-700 dark:text-earth-300 text-sm hover:bg-earth-100 dark:hover:bg-earth-900/60 active:scale-95 transition-all disabled:opacity-40"
+                aria-label="Limpiar todo"
               >
                 Limpiar
               </button>
@@ -119,7 +127,7 @@ export function PinPad({ onComplete, isLoading = false, error = null, onClearErr
                 onClick={handleDelete}
                 disabled={isLoading || pin.length === 0}
                 className="h-16 rounded-2xl flex items-center justify-center text-earth-700 dark:text-earth-300 hover:bg-earth-100 dark:hover:bg-earth-900/60 active:scale-95 transition-all disabled:opacity-40"
-                aria-label="Borrar dígito"
+                aria-label="Borrar último dígito"
               >
                 <Delete className="w-6 h-6" />
               </button>
@@ -132,6 +140,7 @@ export function PinPad({ onComplete, isLoading = false, error = null, onClearErr
               type="button"
               onClick={() => handleDigit(item)}
               disabled={isLoading || pin.length >= 4}
+              aria-label={`Dígito ${item}`}
               className="h-16 rounded-2xl bg-white dark:bg-earth-900/70 border border-earth-200 dark:border-earth-800 flex items-center justify-center text-2xl font-semibold text-earth-900 dark:text-cream-100 shadow-sm hover:bg-earth-50 dark:hover:bg-earth-800 active:scale-95 active:bg-earth-100 transition-all disabled:opacity-50"
             >
               {item}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { BorradorEntry, Agente, SalonConfig, UserSession } from "@/lib/types";
+import { BorradorEntry, Agente, SalonConfig, UserSession, CierreResumen } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import {
   ShieldCheck,
@@ -30,7 +30,8 @@ export default function AdminDashboardPage() {
   // Estados Cierre de Día
   const [confirmCierreOpen, setConfirmCierreOpen] = useState(false);
   const [ejecutandoCierre, setEjecutandoCierre] = useState(false);
-  const [cierreResultado, setCierreResultado] = useState<any | null>(null);
+  const [cierreResultado, setCierreResultado] = useState<CierreResumen | null>(null);
+  const [cierreError, setCierreError] = useState<string | null>(null);
 
   useEffect(() => {
     cargarDatos();
@@ -64,6 +65,7 @@ export default function AdminDashboardPage() {
 
   const handleEjecutarCierre = async () => {
     setEjecutandoCierre(true);
+    setCierreError(null);
     try {
       const res = await fetch("/api/cierre", { method: "POST" });
       const data = await res.json();
@@ -72,14 +74,24 @@ export default function AdminDashboardPage() {
         setConfirmCierreOpen(false);
         await cargarDatos();
       } else {
-        alert(data.error || "Error al ejecutar cierre");
+        setCierreError(data.error || "Error al ejecutar cierre");
       }
     } catch (err) {
-      alert("Error de red al ejecutar cierre");
+      setCierreError("Error de red al ejecutar cierre");
     } finally {
       setEjecutandoCierre(false);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && confirmCierreOpen && !ejecutandoCierre) {
+        setConfirmCierreOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [confirmCierreOpen, ejecutandoCierre]);
 
   const totalVentas = borrador.reduce(
     (acc, curr) => acc + (Number(curr.precio_final) || 0),
@@ -151,6 +163,15 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {loading ? (
+        <div className="py-20 flex flex-col items-center justify-center space-y-4">
+          <div className="w-8 h-8 border-4 border-earth-300 border-t-earth-800 rounded-full animate-spin"></div>
+          <p className="text-sm text-earth-600 dark:text-earth-400 font-medium animate-pulse">
+            Cargando datos del panel...
+          </p>
+        </div>
+      ) : (
+        <>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-2xl p-5 shadow-sm">
@@ -271,17 +292,34 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Modal Confirmación Cierre */}
       {confirmCierreOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-md shadow-2xl p-6">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => !ejecutandoCierre && setConfirmCierreOpen(false)}
+        >
+          <div 
+            className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl w-full max-w-md shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-cierre-title"
+          >
             <div className="flex items-center gap-3 text-amber-600 mb-3">
               <AlertTriangle className="w-6 h-6 shrink-0" />
-              <h3 className="font-bold text-base text-earth-900 dark:text-cream-100">
+              <h3 id="modal-cierre-title" className="font-bold text-base text-earth-900 dark:text-cream-100">
                 ¿Ejecutar Cierre de Día Manual?
               </h3>
             </div>
+            {cierreError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{cierreError}</span>
+              </div>
+            )}
             <p className="text-xs text-earth-600 dark:text-earth-400 leading-relaxed mb-4">
               Esta acción migrará las <strong>{borrador.length} órdenes</strong> activas del{" "}
               <strong>Borrador</strong> hacia la pestaña <strong>OATC</strong> y archivará la{" "}
@@ -302,7 +340,8 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setConfirmCierreOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-earth-200 text-xs font-semibold text-earth-700 hover:bg-earth-50"
+                disabled={ejecutandoCierre}
+                className="px-4 py-2.5 rounded-xl border border-earth-200 text-xs font-semibold text-earth-700 hover:bg-earth-50 disabled:opacity-50"
               >
                 Cancelar
               </button>

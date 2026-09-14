@@ -6,10 +6,15 @@ import {
   getServicios,
   getAgentes,
   getBorrador,
+  getAsistenciaHoy,
+  getCitas,
+  getSalonConfig,
 } from "@/lib/google-sheets";
 import { evaluarAgentesParaTurno } from "@/lib/turnos-algorithm";
-import { getCurrentTimeString } from "@/lib/utils";
+import { getCurrentTimeString, getTodayDateString } from "@/lib/utils";
 import { TurnoEspera } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -17,11 +22,17 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const [turnos, servicios, agentes, borrador] = await Promise.all([
+  const config = await getSalonConfig();
+  const tz = config?.zona_horaria || "America/Lima";
+  const hoy = getTodayDateString(tz);
+
+  const [turnos, servicios, agentes, borrador, asistencias, citas] = await Promise.all([
     getTurnos(),
     getServicios(),
     getAgentes(),
     getBorrador(),
+    getAsistenciaHoy(hoy),
+    getCitas(),
   ]);
 
   const turnosEnEspera = turnos.filter((t) => t.estado === "en_espera");
@@ -31,7 +42,7 @@ export async function GET() {
     const servicio = servicios.find((s) => s.id === turno.id_servicio);
     if (!servicio) return { turno, sugerencia: null };
 
-    const evaluaciones = evaluarAgentesParaTurno(servicio, agentes, borrador);
+    const evaluaciones = evaluarAgentesParaTurno(servicio, agentes, borrador, asistencias, citas);
     const mejorCandidato = evaluaciones.find((e) => e.elegible && !e.enAtencionActiva) || evaluaciones.find((e) => e.elegible) || null;
 
     return {
@@ -76,13 +87,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 });
     }
 
+    const config = await getSalonConfig();
+    const tz = config?.zona_horaria || "America/Lima";
+
     const nuevoTurno: TurnoEspera = {
       id: `TRN-${Math.floor(100 + Math.random() * 900)}`,
       nombre_consumidor: nombre_consumidor.trim(),
       id_servicio: servicio.id,
       nombre_servicio: servicio.nombre,
       especialidad_requerida: servicio.especialidad_requerida,
-      hora_llegada: getCurrentTimeString(),
+      fecha: getTodayDateString(tz),
+      hora_llegada: getCurrentTimeString(tz),
       estado: "en_espera",
       notas: notas ? notas.trim() : undefined,
     };

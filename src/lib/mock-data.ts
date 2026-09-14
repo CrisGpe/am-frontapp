@@ -4,7 +4,7 @@ import { getTodayDateString } from "./utils";
 export const INITIAL_CONFIG: SalonConfig = {
   nombre_salon: "Salón Élite & Spa",
   hora_cierre_auto: "22:00",
-  zona_horaria: "America/Mexico_City",
+  zona_horaria: "America/Lima",
   correlativo_actual: 104,
 };
 

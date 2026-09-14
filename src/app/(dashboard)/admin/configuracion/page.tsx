@@ -37,6 +37,11 @@ export default function AdminConfiguracionPage() {
 
   const handleGuardar = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!config.nombre_salon.trim() || !config.hora_cierre_auto.trim()) {
+      setError("El nombre del salón y la hora de cierre son obligatorios");
+      return;
+    }
+
     setSaving(true);
     setSuccess(false);
     setError(null);
@@ -64,6 +69,19 @@ export default function AdminConfiguracionPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-2xl mx-auto">
+        <div className="py-20 flex flex-col items-center justify-center space-y-4">
+          <div className="w-8 h-8 border-4 border-earth-300 border-t-earth-800 rounded-full animate-spin"></div>
+          <p className="text-sm text-earth-600 dark:text-earth-400 font-medium animate-pulse">
+            Cargando configuración...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       {/* Header */}
@@ -87,14 +105,14 @@ export default function AdminConfiguracionPage() {
       </div>
 
       {success && (
-        <div className="p-4 rounded-2xl bg-sage-50 dark:bg-sage-950 border border-sage-200 text-sage-800 text-xs flex items-center gap-2 font-semibold">
+        <div role="alert" className="p-4 rounded-2xl bg-sage-50 dark:bg-sage-950 border border-sage-200 text-sage-800 text-xs flex items-center gap-2 font-semibold">
           <CheckCircle2 className="w-4 h-4 text-sage-600" />
           <span>Configuración actualizada correctamente</span>
         </div>
       )}
 
       {error && (
-        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 text-red-600 text-xs flex items-center gap-2">
+        <div role="alert" className="p-4 rounded-2xl bg-red-50 dark:bg-red-950 border border-red-200 text-red-600 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
           <span>{error}</span>
         </div>
@@ -106,10 +124,11 @@ export default function AdminConfiguracionPage() {
         className="bg-white dark:bg-earth-900 border border-earth-200 dark:border-earth-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6"
       >
         <div>
-          <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-2">
+          <label htmlFor="nombre_salon" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-2">
             Nombre Comercial del Salón
           </label>
           <input
+            id="nombre_salon"
             type="text"
             value={config.nombre_salon}
             onChange={(e) => setConfig({ ...config, nombre_salon: e.target.value })}
@@ -121,12 +140,13 @@ export default function AdminConfiguracionPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-2">
+          <label htmlFor="hora_cierre_auto" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-2">
             Hora de Cierre Automático (Vercel Cron)
           </label>
           <div className="relative max-w-xs">
             <Clock className="w-4 h-4 text-earth-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
+              id="hora_cierre_auto"
               type="time"
               value={config.hora_cierre_auto}
               onChange={(e) => setConfig({ ...config, hora_cierre_auto: e.target.value })}
@@ -139,12 +159,13 @@ export default function AdminConfiguracionPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-2">
+          <label htmlFor="zona_horaria" className="block text-xs font-bold text-earth-700 dark:text-earth-300 uppercase tracking-wider mb-2">
             Zona Horaria
           </label>
           <div className="relative">
             <Globe className="w-4 h-4 text-earth-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <select
+              id="zona_horaria"
               value={config.zona_horaria}
               onChange={(e) => setConfig({ ...config, zona_horaria: e.target.value })}
               className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-earth-200 dark:border-earth-800 bg-white dark:bg-earth-950 text-earth-900 dark:text-cream-100"

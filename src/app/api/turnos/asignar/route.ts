@@ -7,15 +7,18 @@ import {
   getAgentes,
   getBorrador,
   addBorradorEntry,
+  getSalonConfig,
 } from "@/lib/google-sheets";
 import { seleccionarMejorAgenteParaTurno } from "@/lib/turnos-algorithm";
 import { getTodayDateString, getCurrentTimeString } from "@/lib/utils";
 import { BorradorEntry } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (!user || (user.tipo !== "agente" && user.rol !== "admin")) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
   try {
@@ -61,9 +64,12 @@ export async function POST(req: NextRequest) {
     if (!agenteSeleccionado) {
       return NextResponse.json({ error: "Colaborador no disponible" }, { status: 400 });
     }
+    
+    const config = await getSalonConfig();
+    const tz = config?.zona_horaria || "America/Lima";
 
-    const hoy = getTodayDateString();
-    const hora = getCurrentTimeString();
+    const hoy = getTodayDateString(tz);
+    const hora = getCurrentTimeString(tz);
     const randomCorr = Math.floor(100 + Math.random() * 900);
     const idOatc = `OATC-${hoy.replace(/-/g, "")}-${randomCorr}`;
 
