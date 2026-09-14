@@ -74,7 +74,7 @@ export default function PWAInstaller() {
   if (!showInstaller) return null;
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md bg-white border border-earth-200 shadow-xl rounded-full px-6 py-4 flex items-center justify-between gap-4">
+    <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md bg-white/95 dark:bg-earth-950/95 backdrop-blur-md border border-earth-200 dark:border-earth-800 shadow-2xl rounded-2xl md:rounded-full px-5 py-3.5 flex items-center justify-between gap-3 animate-fade-in">
       {isIOS ? (
         <div className="flex-1 text-sm text-earth-800">
           📱 Toca Compartir ⎋ y luego <strong>&quot;Añadir a pantalla de inicio&quot;</strong> ➕
