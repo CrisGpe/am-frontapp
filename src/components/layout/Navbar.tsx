@@ -12,6 +12,10 @@ import {
   User,
   ClipboardList,
   Users,
+  BarChart2,
+  BarChart3,
+  Boxes,
+  Crown,
   Menu,
   X,
   ShieldCheck,
@@ -49,6 +53,8 @@ export function Navbar({ user }: NavbarProps) {
         { href: "/admin", label: "Dashboard", icon: Sparkles },
         { href: "/admin/borrador", label: "Borrador Diario", icon: ClipboardList },
         { href: "/admin/agentes", label: "Colaboradores", icon: Users },
+        { href: "/admin/inventario", label: "Inventario", icon: Boxes },
+        { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
         { href: "/admin/configuracion", label: "Configuración", icon: Settings },
         { href: "/agente", label: "Vista Agente", icon: Scissors },
       ];
@@ -63,7 +69,9 @@ export function Navbar({ user }: NavbarProps) {
     return [
       { href: "/cliente", label: "Inicio", icon: Sparkles },
       { href: "/cliente/citas", label: "Reservar Cita", icon: Calendar },
+      { href: "/cliente/lealtad", label: "Mis Puntos", icon: Crown },
       { href: "/cliente/historial", label: "Historial", icon: ClipboardList },
+      { href: "/catalogo", label: "Catálogo", icon: Scissors },
     ];
   };
 

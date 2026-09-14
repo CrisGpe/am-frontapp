@@ -1082,3 +1082,139 @@ export async function ejecutarCierreDeDia(): Promise<ResumenCierre> {
     migradoEn: timestamp,
   };
 }
+
+export async function getTodosOATC(): Promise<import('./types').OATCRecord[]> {
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: 'OATC!A2:T',
+      });
+      const rows = res.data.values || [];
+      return rows.map((r) => ({
+        id_oatc: r[0] || '',
+        fecha: r[1] || '',
+        hora_inicio: r[2] || '',
+        tipo_consumidor: r[3],
+        id_cliente: r[4] || undefined,
+        nombre_consumidor: r[5] || '',
+        id_agente: r[6] || '',
+        nombre_agente: r[7] || '',
+        id_servicio: r[8] || '',
+        nombre_servicio: r[9] || '',
+        etapa: r[10],
+        precio_final: Number(r[11]) || 0,
+        productos_usados: r[12] || '',
+        insumos_usados: r[13] || '',
+        productos_vendidos: r[14] || '',
+        correlativo_sistema: r[15] || '',
+        comprobante_externo: r[16] || '',
+        notas: r[17] || '',
+        hora_fin: r[18] || '',
+        migrado_en: r[19] || '',
+      }));
+    } catch (err) {
+      console.warn('Fallback a memoria para todos OATC:', err);
+      return memoryStore.oatc;
+    }
+  }
+  return memoryStore.oatc;
+}
+
+export async function updateProductoStock(id: string, nuevoStock: number): Promise<Producto | null> {
+  const stockVal = Math.max(0, nuevoStock);
+  const idx = memoryStore.productos.findIndex((p) => p.id === id);
+  if (idx !== -1) {
+    memoryStore.productos[idx].stock = stockVal;
+  }
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Productos!A2:A",
+      });
+      const rows = res.data.values || [];
+      const rowIndex = rows.findIndex((r) => r[0] === id);
+      if (rowIndex !== -1) {
+        const rowNum = rowIndex + 2;
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Productos!F${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [[String(stockVal)]] },
+        });
+      }
+    } catch (err) {
+      console.error("Error actualizando stock de producto en Google Sheets:", err);
+    }
+  }
+
+  return idx !== -1 ? memoryStore.productos[idx] : null;
+}
+
+export async function updateInsumoStock(id: string, nuevoStock: number): Promise<Insumo | null> {
+  const stockVal = Math.max(0, nuevoStock);
+  const idx = memoryStore.insumos.findIndex((i) => i.id === id);
+  if (idx !== -1) {
+    memoryStore.insumos[idx].stock = stockVal;
+  }
+
+  const client = getSheetsClient();
+  if (client) {
+    try {
+      const res = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: client.sheetId,
+        range: "Insumos!A2:A",
+      });
+      const rows = res.data.values || [];
+      const rowIndex = rows.findIndex((r) => r[0] === id);
+      if (rowIndex !== -1) {
+        const rowNum = rowIndex + 2;
+        await client.sheets.spreadsheets.values.update({
+          spreadsheetId: client.sheetId,
+          range: `Insumos!E${rowNum}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: [[String(stockVal)]] },
+        });
+      }
+    } catch (err) {
+      console.error("Error actualizando stock de insumo en Google Sheets:", err);
+    }
+  }
+
+  return idx !== -1 ? memoryStore.insumos[idx] : null;
+}
+
+export async function descontarInventarioPorAtencion(
+  productosVendidosStr?: string,
+  insumosUsadosStr?: string
+): Promise<void> {
+  if (productosVendidosStr) {
+    const items = productosVendidosStr.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const item of items) {
+      const [id, cantStr] = item.split(":");
+      const cantidad = parseInt(cantStr, 10) || 1;
+      const prods = await getProductos();
+      const p = prods.find((prod) => prod.id === id);
+      if (p) {
+        await updateProductoStock(id, p.stock - cantidad);
+      }
+    }
+  }
+
+  if (insumosUsadosStr) {
+    const items = insumosUsadosStr.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const item of items) {
+      const [id, cantStr] = item.split(":");
+      const cantidad = parseInt(cantStr, 10) || 1;
+      const ins = await getInsumos();
+      const i = ins.find((insumo) => insumo.id === id);
+      if (i) {
+        await updateInsumoStock(id, i.stock - cantidad);
+      }
+    }
+  }
+}

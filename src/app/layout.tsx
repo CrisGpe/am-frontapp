@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+import PWAInstaller from "@/components/pwa/PWAInstaller";
+
 export const metadata: Metadata = {
   title: "Salón Élite & Spa | CRM",
   description: "Sistema de gestión integral para salones de belleza y estética",
@@ -26,6 +28,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased selection:bg-earth-500 selection:text-white">
         {children}
+        <PWAInstaller />
       </body>
     </html>
   );

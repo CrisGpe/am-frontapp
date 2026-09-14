@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBorrador, addBorradorEntry, updateBorradorEntry } from "@/lib/google-sheets";
+import { getBorrador, addBorradorEntry, updateBorradorEntry, descontarInventarioPorAtencion } from "@/lib/google-sheets";
 import { getCurrentUser } from "@/lib/auth";
 import { BorradorEntry } from "@/lib/types";
 
@@ -48,6 +48,15 @@ export async function PATCH(req: NextRequest) {
     const updated = await updateBorradorEntry(id_oatc, updates);
     if (!updated) {
       return NextResponse.json({ error: "Entrada no encontrada" }, { status: 404 });
+    }
+
+    // Descontar inventario automáticamente si la atención fue completada
+    if (updates.etapa === "completada") {
+      try {
+        await descontarInventarioPorAtencion(updates.productos_vendidos, updates.insumos_usados);
+      } catch (stockErr) {
+        console.error("Error al descontar inventario:", stockErr);
+      }
     }
 
     return NextResponse.json({ success: true, entry: updated });
